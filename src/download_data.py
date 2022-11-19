@@ -88,11 +88,11 @@ def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe)
   try:
     # Download from url_for_image 
     urllib.request.urlretrieve(url_for_image, file_location)
-    unzip_tar(folder_location,file_location)
+    unzip_tar(file_location,folder_location)
     keep_n_files(folder_location,images_per_class)
     
   except Exception as e:
-    tf.compat.v1.logging.info("Problem downloading imagenet class. Exception was " +
+    tf.compat.v1.logging.error("Problem downloading imagenet class. Exception was " +
                              str(e) + " for URL "+url_for_image)
 
   number_of_images = len(os.listdir(folder_location))
@@ -112,8 +112,11 @@ def download_imagenet(imagenet_classes,images_per_class):
         Creates new folders in dataset for each ImageNet class
     """
     
+    tf.compat.v1.logging.info("Downloading imagenet_classes {}".format(imagenet_classes))
+    
     imagenet_dataframe = fetcher.make_imagenet_dataframe("./dataset/meta/imagenet_url_map.csv")
     source_dir = "./dataset"
 
     for image in imagenet_classes:
+        tf.compat.v1.logging.info("Downloading class {}".format(image))
         fetch_imagenet_class(source_dir, image, images_per_class, imagenet_dataframe)
