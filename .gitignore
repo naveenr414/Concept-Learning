@@ -1,2 +1,4 @@
 dataset/
 .ipynb_checkpoints
+*.egg-info
+src/__pycache__/
