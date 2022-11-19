@@ -115,7 +115,7 @@ def download_imagenet(imagenet_classes,images_per_class):
     tf.compat.v1.logging.info("Downloading imagenet_classes {}".format(imagenet_classes))
     
     imagenet_dataframe = fetcher.make_imagenet_dataframe("./dataset/meta/imagenet_url_map.csv")
-    source_dir = "./dataset"
+    source_dir = "./dataset/images"
 
     for image in imagenet_classes:
         tf.compat.v1.logging.info("Downloading class {}".format(image))
