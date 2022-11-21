@@ -30,7 +30,7 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
         for alpha in alphas:
             file_name_pattern = "{}-random*-{}-linear-{}.pkl".format(concept,bottleneck,alpha)
             all_matching_files += glob.glob(dataset_location+"/"+file_name_pattern)
-            
+                        
             for file_name in all_matching_files:
                 re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(concept,bottleneck,alpha),file_name)
                 random_concept = re_search.group(0)
