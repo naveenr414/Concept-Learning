@@ -17,12 +17,24 @@ def test_load_imagenet():
     assert len(imagenet_dataframe[imagenet_dataframe["class_name"] == "zebra"]) == 1
     
     assert download_imagenet(["zebra","goldfish"],1) == None
-    assert len(os.listdir("./dataset/zebra")) == 1
-    assert len(os.listdir("./dataset/goldfish")) == 1
+    assert len(os.listdir("./dataset/images/zebra")) == 1
+    assert len(os.listdir("./dataset/images/goldfish")) == 1
 
     assert download_imagenet(["zebra","goldfish"],5) == None
-    assert len(os.listdir("./dataset/zebra")) == 5
-    assert len(os.listdir("./dataset/goldfish")) == 5
+    assert len(os.listdir("./dataset/images/zebra")) == 5
+    assert len(os.listdir("./dataset/images/goldfish")) == 5
+
+def test_random_imagenet():
+    """Tests the download_random_imagenet_classes function"""
+    imagenet_dataframe = fetcher.make_imagenet_dataframe("./dataset/meta/imagenet_url_map.csv")
+    
+    assert download_random_imagenet_classes(1,1) == None
+    assert len(os.listdir("./dataset/images/random500_0")) == 1
+    
+    assert download_random_imagenet_classes(2,5) == None
+    assert len(os.listdir("./dataset/images/random500_0")) == 5
+    assert len(os.listdir("./dataset/images/random500_1")) == 5
     
 if __name__ == "__main__":
     test_load_imagenet()
+    test_random_imagenet()

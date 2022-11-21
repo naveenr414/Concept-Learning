@@ -45,7 +45,7 @@ def keep_n_files(folder_location,num_files):
     check_call(["ls  {}/* | head -n -{} | xargs -d '\n' rm -f".format(folder_location,num_files)], 
                shell=True)
 
-def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe):
+def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe, input_folder_location=""):
   """Fetch all images from an imagenet class
   
   Arguments:
@@ -53,9 +53,11 @@ def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe)
       class_name: ImageNet class_name for images; images are stored at path/class_name
       images_per_class: How many image files should be stored per class
       imagenet_dataframe: Dataframe mapping ImageNet classes to dataframes
+      input_folder_location: Which folder the output images should be dumped to; by default 
+          this is the same as class_name
 
   Returns:
-    None
+    -1 for failure; None otherwise
     
   Side Effects:
     Creates new folder with ImageNet images by downloading from URL
@@ -79,7 +81,10 @@ def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe)
     
   url_for_image = "https://image-net.org/data/winter21_whole/{}.tar".format(class_id)
   file_location = path +"/"+class_name.lower().replace(" ","_")+".tar"
-  folder_location = path + "/"+class_name.lower().replace(" ","_")
+  if input_folder_location != "":
+    folder_location = path+"/"+input_folder_location
+  else:
+    folder_location = path + "/"+class_name.lower().replace(" ","_")
     
   tf.compat.v1.logging.info("Fetching imagenet data for " + class_name)
   tf.io.gfile.makedirs(folder_location)
@@ -94,6 +99,7 @@ def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe)
   except Exception as e:
     tf.compat.v1.logging.error("Problem downloading imagenet class. Exception was " +
                              str(e) + " for URL "+url_for_image)
+    return -1
 
   number_of_images = len(os.listdir(folder_location))
   tf.compat.v1.logging.info("Downloaded {} images for {}".format(number_of_images,class_name))
@@ -120,3 +126,38 @@ def download_imagenet(imagenet_classes,images_per_class):
     for image in imagenet_classes:
         tf.compat.v1.logging.info("Downloading class {}".format(image))
         fetch_imagenet_class(source_dir, image, images_per_class, imagenet_dataframe)
+
+def download_random_imagenet_classes(num_classes,images_per_class):
+    """Downloads random ImageNet classes as a ground truth for TCAV
+    
+    Arguments:
+        num_classes: Number of random ImageNet Classes; note n+1 classes 
+            are needed to run n experiments
+        images_per_class: How many images we keep per class
+
+    Return: 
+        None
+        
+    Side Effects:
+        Creates num_classes new folders in dataset
+    """
+    
+    tf.compat.v1.logging.info("Downloading {} random ImageNet classes".format(num_classes))
+    random_folder_prefix = "random500"
+    
+    imagenet_dataframe = fetcher.make_imagenet_dataframe("./dataset/meta/imagenet_url_map.csv")
+    source_dir = "./dataset/images"
+    
+    sampled_dataframe = imagenet_dataframe.sample(n = num_classes*2)
+    num_created_classes = 0    
+    for i,image in enumerate(sampled_dataframe["class_name"]):
+        if num_created_classes >= num_classes:
+            break
+        
+        tf.compat.v1.logging.info("Downloading class {}".format(image))
+        result = fetch_imagenet_class(source_dir, image, images_per_class, imagenet_dataframe,
+                                 input_folder_location="{}_{}".format(random_folder_prefix,i))
+        
+        if result != -1:
+            num_created_classes += 1
+        
