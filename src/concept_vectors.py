@@ -8,6 +8,7 @@ import tcav.utils as utils
 import glob
 import pickle
 import re
+import argparse
 
 def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
     """Loads all the TCAV vectors for a given concept + bottleneck combination
@@ -89,5 +90,31 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
                    cav_dir=cav_dir,
                    num_random_exp=num_random_exp)#10)
     mytcav.run(run_parallel=False)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
+    parser.add_argument('--algorithm',type=str,
+                        help='Which algorithm to use to generate concept vectors')
+    parser.add_argument('--class_name', type=str,
+                        help='Name of the ImageNet class for which concept vectors are generated.')
+    parser.add_argument('--target', type=str,
+                        help='Target which the concept vectors are aiming to predict.',default='zebra')
+    parser.add_argument('--model_name', type=str,
+                        help='Name of the model used to generate concept vectors',default="GoogleNet")
+    parser.add_argument('--alpha',type=float,
+                        help='Regularization parameter to train concept vector',default=0.1)
+    parser.add_argument('--bottleneck',type=str,
+                        help='Layer of model used when training concept vectors; activations are taken from this',
+                        default='mixed4c')
+    parser.add_argument('--num_random_exp', type=int,
+                        help='Number of random ImageNet classes we compare the concept vector with')
+
+    args = parser.parse_args()
     
+    if args.algorithm not in ['tcav']:
+        raise Exception("{} not implemented to generate concept vectors".format(parser.algorithm))
+    
+    if args.algorithm == 'tcav':
+        create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha])
+
    

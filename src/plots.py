@@ -7,9 +7,12 @@ from collections import defaultdict
 
 color_palette = ['#377eb8', '#ff7f00', '#4daf4a',
                   '#f781bf', '#a65628']
-extra_large_color_palette = color_palette + ['#984ea3',
-                                             '#999999', '#e41a1c', '#dede00','#994f00']
-scatter_shapes = ["o","v","1","s","*"]
+extra_large_color_palette = ['#984ea3','#999999', '#e41a1c', '#dede00','#994f00'] 
+extra_large_color_palette = color_palette + extra_large_color_palette
+scatter_shapes = ["o","v","D","s","*"]
+
+plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_palette)
+plt.style.use('ggplot')
 
 def scatter_labels(data,labels=[]):
     """

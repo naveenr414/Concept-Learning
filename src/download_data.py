@@ -5,6 +5,7 @@ import urllib
 import socket
 from subprocess import DEVNULL, STDOUT, check_call
 import tensorflow as tf
+import argparse
 
 def unzip_tar(file_location,folder_location):
     """Unzip tar file at file_location into folder at folder_location
@@ -160,4 +161,26 @@ def download_random_imagenet_classes(num_classes,images_per_class):
         
         if result != -1:
             num_created_classes += 1
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
+    parser.add_argument('--class_name', type=str,
+                        help='Name of the ImageNet class which we aim to download',nargs='?',default='')
+    parser.add_argument('--num_random_classes',type=int,
+                        help='When generating random classes, the number of such random classes to generate',
+                        default=10)
+    parser.add_argument('--random_class',action='store_true')
+    parser.add_argument('--images_per_class',type=str,
+                        help='How many images to download for the ImageNet class')
+
+    args = parser.parse_args()
+    
+    if not args.random_class and args.class_name == '':
+        raise Exception("Class name must be specified for non-random ImageNet classes")
+    
+    if args.random_class:
+        download_random_imagenet_classes(args.num_random_classes,args.images_per_class)
+    else:
+        download_imagenet([args.class_name],args.images_per_class)
+
         
