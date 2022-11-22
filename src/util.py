@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial import distance_matrix
 from collections import Counter
+from collections import defaultdict
 
 def find_average_distances(vector_list,class_list):
     """Given a list of vectors, each a member of a certain class, find the average distance between pairs of classes
@@ -69,4 +70,28 @@ def find_unique_in_order(class_list):
     used = set()
     unique = [x for x in class_list if x not in used and (used.add(x) or True)]
     return unique 
-            
+
+def aggregate_by_class(vector_list,concept_list,aggregation_function):
+    """Aggregate vector according to their membership in some class, 
+        through the aggregation function
+        
+    Parameters:
+        vector_list: Numpy matrix of concept vectors
+        class_list: Membership status for each concept vector
+        aggregation function: Given a list of vectors, it returns the aggregation of all vectors
+
+    Returns:
+        A list of vectors, one for each class
+    """
+
+    vector_by_class = defaultdict(lambda: [])
+    for i in range(len(vector_list)):
+        vector_by_class[concept_list[i]].append(vector_list[i])
+    
+    concept_order = find_unique_in_order(concept_list)
+    ret_vector = []
+    for concept in concept_order:
+        ret_vector.append(aggregation_function(vector_by_class[concept]))
+
+    return np.array(ret_vector)
+    
