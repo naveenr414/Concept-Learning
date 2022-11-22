@@ -80,11 +80,11 @@ def fetch_imagenet_class(path, class_name, images_per_class, imagenet_dataframe,
 
     
   url_for_image = "https://image-net.org/data/winter21_whole/{}.tar".format(class_id)
-  file_location = path +"/"+class_name.lower().replace(" ","_")+".tar"
+  file_location = path +"/"+class_name+".tar"
   if input_folder_location != "":
     folder_location = path+"/"+input_folder_location
   else:
-    folder_location = path + "/"+class_name.lower().replace(" ","_")
+    folder_location = path + "/"+class_name
     
   tf.compat.v1.logging.info("Fetching imagenet data for " + class_name)
   tf.io.gfile.makedirs(folder_location)
