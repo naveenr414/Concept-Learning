@@ -6,3 +6,4 @@ src/__pycache__/*
 logs/
 *.pyc
 results/
+scripts/Figures/

@@ -36,5 +36,37 @@ def find_average_distances(vector_list,class_list):
                 avg_distance_class[i][j]/=num_pairs
 
     return avg_distance_class
-            
+
+def encode_list(class_list):
+    """Encode a list of classes into a list of numbers; 
+        ['dog','cat','cat','dog'] -> [0,1,1,0]
+        
+    Parameters:
+        class_list: A list of strings, representing what each class is
+    
+    Returns:
+        List of numbers, one for each class
+    """
+    
+    class_to_num = {}
+    for i in class_list:
+        if i not in class_to_num:
+            class_to_num[i] = len(class_to_num)
+
+    return [class_to_num[i] for i in class_list]
+
+def find_unique_in_order(class_list):
+    """Get the unique elements of a list, preserving order
+        ['dog','cat','cat','dog'] -> ['dog','cat']
+    
+    Parameters:
+        class_list: A list of strings (or any object)
+
+    Returns:
+        List containing unique elements in order
+    """
+    
+    used = set()
+    unique = [x for x in class_list if x not in used and (used.add(x) or True)]
+    return unique 
             

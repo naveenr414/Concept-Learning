@@ -30,6 +30,11 @@ def test_avg_distance():
     assert ret[0][0] == 1
     assert ret[0][1] == ret[1][0] == 0.5
     
+def test_list_functions():
+    assert encode_list(['cat','dog','dog','cat']) == [0,1,1,0]
+    assert find_unique_in_order(['cat','dog','dog','cat']) == ['cat','dog']
+    
 if __name__ == '__main__':
     test_avg_distance()
+    test_list_functions()
     print("All tests passed")

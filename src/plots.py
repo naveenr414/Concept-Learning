@@ -45,7 +45,7 @@ def scatter_labels(data,labels=[]):
         plt.scatter(data_by_label[label][:,0],data_by_label[label][:,1],label=label,
                     c=color,marker=shape)
     plt.legend()
-        
+
 
 def plot_tsne(data,labels=[]): 
     """
