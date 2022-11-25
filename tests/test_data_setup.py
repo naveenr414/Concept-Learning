@@ -35,6 +35,8 @@ def test_random_imagenet():
     assert len(os.listdir("./dataset/images/random500_0")) == 5
     assert len(os.listdir("./dataset/images/random500_1")) == 5
     
+    assert download_random_imagenet_classes(2,50) == None
+    
 if __name__ == "__main__":
     test_load_imagenet()
     test_random_imagenet()

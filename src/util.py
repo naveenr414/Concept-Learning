@@ -1,21 +1,48 @@
 import numpy as np
 from scipy.spatial import distance_matrix
+from scipy.spatial.distance import cosine 
 from collections import Counter
 from collections import defaultdict
 
-def find_average_distances(vector_list,class_list):
+def cosine_matrix(vector_a,vector_b):
+    """Find the cosine similarity distance for every pair of vectors in vector_a and vector_b
+    
+    Arguments:
+        vector_a: nxk matrix of vectors 
+        vector_b: mxk matrix of vectors
+
+    Returns:
+        An nxm matrix of cosine similarity distances (1-cosine similarity) for every pair 
+            of vectors 
+    """
+    
+    n = len(vector_a)
+    m = len(vector_b)
+    distances = np.zeros((n,m))
+    for i,vec_a in enumerate(vector_a):
+        for j,vec_b in enumerate(vector_b):
+            distances[i][j] = cosine(vec_a,vec_b)
+
+    return distances
+
+def find_average_distances(vector_list,class_list,cosine_metric=False):
     """Given a list of vectors, each a member of a certain class, find the average distance between pairs of classes
     
     Arguments:
         vector_list: n by k matrix of vectors
         class_list: int list of length n, each index representing membership in a certain class
             number 0...r-1
+        cosine_metric: boolean that specifies whether to use cosine similarity 
+            instead of eucldiean norm to compute distance 
         
     Returns:
         An rxr matrix with average distances between each class, where r=# of classes
     """
     
-    distances = distance_matrix(vector_list,vector_list)
+    if not cosine_metric:
+        distances = distance_matrix(vector_list,vector_list)
+    else:
+        distances = cosine_matrix(vector_list,vector_list)
     number_by_class = Counter(class_list)
     num_classes = len(number_by_class)
     
