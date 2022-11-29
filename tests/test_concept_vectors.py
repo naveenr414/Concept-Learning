@@ -1,6 +1,19 @@
 from src.concept_vectors import *
 from src.download_data import *
 import os
+import numpy as np
+
+def test_cem():
+    assert len(load_cem_vectors("xor",0))>0
+    assert len(load_cem_vectors("xor",1))>0
+    
+    xor_concepts = {}
+    for i in [0,1]:
+        for j in ["active","inactive"]:
+            xor_concepts["{}_{}".format(i,j)] = np.load("./results/cem_concepts/xor_concept_{}_{}.npy".format(i,j))
+
+    assert len(xor_concepts['0_active']) + len(xor_concepts['0_inactive']) ==  \
+        len(xor_concepts['1_active']) + len(xor_concepts['1_inactive']) 
 
 def test_tcav():
     concepts = ["soccer","alga"]
@@ -30,3 +43,4 @@ def test_tcav():
     
 if __name__ == "__main__":
     test_tcav()
+    test_cem()

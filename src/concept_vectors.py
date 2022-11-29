@@ -10,19 +10,21 @@ import pickle
 import re
 import argparse
 
-def load_cem_vectors(concept_number):
+def load_cem_vectors(experiment_name,concept_number):
     """Load all the 'active' embeddings from Concept Embedding Models
     
     Arguments:
+        experiment_name: Which experiment these concepts come from
+            Concept files are of form {experiment_name}_concept...
         concept_number: An index for which concept is used
             Should correspond to the index in the 'c' array in CEM
 
     Returns:
         Numpy array of size (k,n), where k = number of concept vectors, and n = size of embedding
     """
-    dataset_location = "../sandbox/cem/concepts"
+    dataset_location = "results/cem_concepts"
     
-    file_location = dataset_location + "/concept_{}_active.npy".format(concept_number)
+    file_location = dataset_location + "/{}_concept_{}_active.npy".format(experiment_name,concept_number)
     return np.load(open(file_location,"rb"))
 
 def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
