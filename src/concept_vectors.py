@@ -9,6 +9,7 @@ import glob
 import pickle
 import re
 import argparse
+from src.dataset import get_cub_attributes, load_cub_split
 
 def load_cem_vectors(experiment_name,concept_number):
     """Load all the 'active' embeddings from Concept Embedding Models
@@ -62,7 +63,32 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
 
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
+
+def get_cub_images_by_attribute(attribute_name):
+    """Return a list of bird image files with some attribute
     
+    Arguments: 
+        attribute_name: One of the 112 attributes in attributes.txt
+
+    Returns:
+        String list, with the locations of each image containing attribute
+    """
+    
+    all_attributes = get_cub_attributes()
+    if attribute_name not in all_attributes:
+        raise Exception("{} not found in the 112 CUB attributes".format(attribute_name))
+        
+    attribute_index = all_attributes.index(attribute_name)
+    train_data = load_cub_split("train")
+    
+    unfiltered_image_locations = [i['img_path'] for i in train_data if i['attribute_label'][attribute_index] == 1]
+    filtered_image_locations = [i.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","") 
+                                 for i in unfiltered_image_locations]
+    prefix = "dataset/CUB/images/"
+    filtered_image_locations = [prefix+i for i in filtered_image_locations]
+    return filtered_image_locations
+    
+
 def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1]):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     

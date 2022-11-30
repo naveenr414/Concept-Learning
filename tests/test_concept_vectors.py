@@ -2,7 +2,17 @@ from src.concept_vectors import *
 from src.download_data import *
 import os
 import numpy as np
+from src.dataset import get_cub_attributes
 
+def test_tcav_cub():
+    all_attributes = get_cub_attributes()
+    
+    image_locations = get_cub_images_by_attribute(all_attributes[0])
+    assert len(image_locations) > 0
+    assert os.path.exists(image_locations[0])    
+    
+    assert len(get_cub_images_by_attribute(all_attributes[10])) > 0
+    
 def test_cem():
     assert len(load_cem_vectors("xor",0))>0
     assert len(load_cem_vectors("xor",1))>0
@@ -44,3 +54,4 @@ def test_tcav():
 if __name__ == "__main__":
     test_tcav()
     test_cem()
+    test_tcav_cub()
