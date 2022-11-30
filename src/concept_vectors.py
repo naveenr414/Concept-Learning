@@ -64,6 +64,27 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
+def create_vector_from_label_cub(attribute_name):
+    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
+        This produces a 0-1 vector, with the vector <0,1,0> representing
+        the presence of the attribute in data point 1, and not present in datapoints 0, 2
+        
+    Arguments:
+        attribute_name: String representing one of the 112 CUB attributes
+
+    Returns:
+        concept_vector: Numpy vector representing the concept vector for the attribute
+    """
+    
+    all_attributes = get_cub_attributes()
+    if attribute_name not in all_attributes:
+        raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
+    index = all_attributes.index(attribute_name)
+    
+    train_data = load_cub_split('train')
+    concept_vector = [i['attribute_label'][index] for i in train_data]
+    return np.array(concept_vector)
+
 def create_tcav_cub(attribute_name,num_random_exp):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,

@@ -4,6 +4,12 @@ import os
 import numpy as np
 from src.dataset import get_cub_attributes
 
+def test_label_cub():
+    all_attributes = get_cub_attributes()
+
+    assert len(create_vector_from_label_cub(all_attributes[0])) > 0
+    assert len(create_vector_from_label_cub(all_attributes[1])) > 0
+    
 def test_tcav_cub():
     all_attributes = get_cub_attributes()
     
@@ -12,6 +18,9 @@ def test_tcav_cub():
     assert os.path.exists(image_locations[0])    
     
     assert len(get_cub_images_by_attribute(all_attributes[10])) > 0
+    
+    assert create_tcav_cub(all_attributes[0],2) == None
+    assert os.path.exists("./results/cavs/{}-random500_0-mixed4c-linear-0.1.pkl".format(all_attributes[0]))
     
 def test_cem():
     assert len(load_cem_vectors("xor",0))>0
@@ -55,3 +64,4 @@ if __name__ == "__main__":
     test_tcav()
     test_cem()
     test_tcav_cub()
+    test_label_cub()
