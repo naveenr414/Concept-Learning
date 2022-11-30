@@ -14,7 +14,29 @@ scatter_shapes = ["o","v","D","s","*"]
 plt.rcParams['axes.prop_cycle'] = plt.cycler(color=color_palette)
 plt.style.use('ggplot')
 
-def scatter_labels(data,labels=[]):
+def filter_data_labels(data,labels,filter_labels):
+    """
+    Filters a dataset + labels based on a filter function
+    Each label is fed into the filter_labels function; 
+        those which return True are kept
+        
+    Arguments: 
+        data: Numpy matrix of data
+        labels: String label for each data point
+        filter_labels: Boolean function that asserts if 
+            each data point should be kept
+
+    Returns:
+        data: Numpy matrix of data
+        labels: String label for each data point
+    """
+    useful_labels = [index for index in range(len(labels)) if filter_labels(labels[index])]
+    useful_labels_set = set(useful_labels)
+    data = data[useful_labels]
+    labels = [label for i,label in enumerate(labels) if i in useful_labels_set] 
+    return data, labels
+
+def scatter_labels(data,labels=[],filter_labels=None):
     """
     Helper function to scatter points with labels for each point
     
@@ -34,6 +56,9 @@ def scatter_labels(data,labels=[]):
         plt.scatter(data)
         return
     
+    if filter_labels:
+        data, labels = filter_data_labels(data,labels,filter_labels)
+
     data_by_label = defaultdict(lambda: [])
     for i in range(len(labels)):
         data_by_label[labels[i]].append(data[i])
@@ -44,18 +69,15 @@ def scatter_labels(data,labels=[]):
         shape = scatter_shapes[i//len(color_palette)]
         plt.scatter(data_by_label[label][:,0],data_by_label[label][:,1],label=label,
                     c=color,marker=shape)
-    plt.legend()
+    plt.legend()    
 
-
-def plot_tsne(data,labels=[]): 
+def plot_tsne(data,labels=[],filter_labels=None): 
     """
     Embeds high-dimensional data into 2D dimensions using TSNE algorithm, then plots it
     
     Arguments:
         data: Numpy matrix of data
-        colors (optional): Color of each data point in the scatter plot; 
-            used when data comes from separate classes or categories
-        labels (optional): Labe for each data point
+        labels (optional): Label for each data point
     
     Returns:
         None
@@ -63,18 +85,20 @@ def plot_tsne(data,labels=[]):
     Side Effects:
         Plots scatter plot using data
     """
+        
     X_embedded = TSNE(n_components=2, learning_rate='auto',
                   init='random', perplexity=3).fit_transform(data)
-    scatter_labels(X_embedded,labels)
+    scatter_labels(X_embedded,labels,filter_labels)
     
-def plot_pca(data,labels=[]): 
+def plot_pca(data,labels=[],filter_labels=None): 
     """
     Embeds high-dimensional data into 2D dimensions using PCA algorithm, then plots it
     
     Arguments:
         data: Numpy matrix of data
-        colors (optional): Color of each data point in the scatter plot; 
-            used when data comes from separate classes or categories
+        labels (optional): Label for each data point
+        filter_labels (optional): Function that determines which datapoints
+            should be kept
     
     Returns:
         None
@@ -82,5 +106,6 @@ def plot_pca(data,labels=[]):
     Side Effects:
         Plots scatter plot using data
     """
+    
     X_embedded = PCA(n_components=2).fit_transform(data)
-    scatter_labels(X_embedded,labels)
+    scatter_labels(X_embedded,labels,filter_labels)
