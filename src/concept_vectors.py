@@ -9,7 +9,7 @@ import glob
 import pickle
 import re
 import argparse
-from src.dataset import get_cub_attributes, load_cub_split
+from src.dataset import *
 
 def load_cem_vectors(experiment_name,concept_number):
     """Load all the 'active' embeddings from Concept Embedding Models
@@ -64,31 +64,31 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
-def get_cub_images_by_attribute(attribute_name):
-    """Return a list of bird image files with some attribute
+def create_tcav_cub(attribute_name,num_random_exp):
+    """Helper function to create TCAV from CUB Attribute
+        It creates the folder with images for the attribute, trains the TCAV vector,
+        then deletes the folder
     
-    Arguments: 
-        attribute_name: One of the 112 attributes in attributes.txt
+    Arguments:
+        attribute_name: String containing one of the 112 CUB attributes
 
     Returns:
-        String list, with the locations of each image containing attribute
+        None
+        
+    Side Effects:
+        Trains a set of concept vectors, stored at ./results/cavs
     """
     
-    all_attributes = get_cub_attributes()
-    if attribute_name not in all_attributes:
-        raise Exception("{} not found in the 112 CUB attributes".format(attribute_name))
-        
-    attribute_index = all_attributes.index(attribute_name)
-    train_data = load_cub_split("train")
+    create_folder_from_attribute(attribute_name)
     
-    unfiltered_image_locations = [i['img_path'] for i in train_data if i['attribute_label'][attribute_index] == 1]
-    filtered_image_locations = [i.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","") 
-                                 for i in unfiltered_image_locations]
-    prefix = "dataset/CUB/images/"
-    filtered_image_locations = [prefix+i for i in filtered_image_locations]
-    return filtered_image_locations
-    
+    concepts = [attribute_name]
+    target = "zebra"
+    model_name = "GoogleNet"
+    bottlenecks = ["mixed4c"]
+    alphas = [0.1]
 
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
+    
 def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1]):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     
@@ -154,10 +154,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    if args.algorithm not in ['tcav']:
+    if args.algorithm not in ['tcav','tcav_cub']:
         raise Exception("{} not implemented to generate concept vectors".format(parser.algorithm))
     
     if args.algorithm == 'tcav':
         create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha])
-
+    elif args.algorithm == 'tcav_cub':
+        create_tcav_cub(args.class_name,args.num_random_exp)
    

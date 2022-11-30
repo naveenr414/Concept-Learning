@@ -10,7 +10,7 @@ def test_cub():
     
     train = load_cub_split("train")
     assert 'img_path' in train[0]
-    assert 'attributes' in train[0]
+    assert 'attribute_label' in train[0]
 
 if __name__ == "__main__":
     test_cub()
