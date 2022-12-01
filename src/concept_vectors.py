@@ -153,6 +153,15 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
                    alphas,
                    cav_dir=cav_dir,
                    num_random_exp=num_random_exp)#10)
+    
+    # Reset the runs so it doesn't compare random-random
+    mytcav.relative_tcav = True
+    mytcav._process_what_to_run_expand(num_random_exp=num_random_exp+1)
+    mytcav.params = mytcav.get_params()
+    
+    print("Pairs to test {}".format(mytcav.pairs_to_test))
+    print("Params {}".format(mytcav.params))
+
     mytcav.run(run_parallel=False)
 
 if __name__ == "__main__":
