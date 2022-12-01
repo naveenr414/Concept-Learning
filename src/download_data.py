@@ -21,13 +21,13 @@ def unzip_tar(file_location,folder_location):
         Extracts file_location into folder_location
     """
     
-    check_call(["mkdir -p {}".format(folder_location)],stdout=DEVNULL, stderr=STDOUT,shell=True)
-    check_call(["rm -f {}/*".format(folder_location)],stdout=DEVNULL, stderr=STDOUT,shell=True)
-    check_call(["tar xvf {} --directory {}".format(file_location,folder_location)],
+    check_call(['mkdir -p "{}"'.format(folder_location)],stdout=DEVNULL, stderr=STDOUT,shell=True)
+    check_call(['rm -f "{}"/*'.format(folder_location)],stdout=DEVNULL, stderr=STDOUT,shell=True)
+    check_call(['tar xvf "{}" --directory {}'.format(file_location,folder_location)],
               stdout=DEVNULL,
               stderr=STDOUT, 
               shell=True)
-    check_call(["rm {}".format(file_location)],stdout=DEVNULL,stderr=STDOUT, shell=True)
+    check_call(['rm "{}"'.format(file_location)],stdout=DEVNULL,stderr=STDOUT, shell=True)
 
 def keep_n_files(folder_location,num_files):
     """Keep only num_files at folder_location, deleting all others
@@ -149,18 +149,25 @@ def download_random_imagenet_classes(num_classes,images_per_class):
     imagenet_dataframe = fetcher.make_imagenet_dataframe("./dataset/meta/imagenet_url_map.csv")
     source_dir = "./dataset/images"
     
-    sampled_dataframe = imagenet_dataframe.sample(n = num_classes*2)
+    sampled_dataframe = imagenet_dataframe.sample(n = num_classes)
     num_created_classes = 0    
-    for i,image in enumerate(sampled_dataframe["class_name"]):
-        if num_created_classes >= num_classes:
-            break
-        
+    current_class_index = 0
+    
+    # Keep writing random files till we reach the desired number of classes
+    while num_created_classes < num_classes:
+        image = list(sampled_dataframe["class_name"])[current_class_index]
+
         tf.compat.v1.logging.info("Downloading class {}".format(image))
         result = fetch_imagenet_class(source_dir, image, images_per_class, imagenet_dataframe,
-                                 input_folder_location="{}_{}".format(random_folder_prefix,i))
+                                 input_folder_location="{}_{}".format(random_folder_prefix,num_created_classes))
         
         if result != -1:
             num_created_classes += 1
+        current_class_index += 1
+
+        if current_class_index >= len(sampled_dataframe):
+            sampled_dataframe = imagenet_dataframe.sample(n = num_classes)
+            current_class_index = 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')

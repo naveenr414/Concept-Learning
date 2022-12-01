@@ -38,5 +38,5 @@ def test_random_imagenet():
     assert download_random_imagenet_classes(2,50) == None
     
 if __name__ == "__main__":
-    test_load_imagenet()
     test_random_imagenet()
+    test_load_imagenet()
