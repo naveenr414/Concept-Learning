@@ -83,7 +83,7 @@ def create_vector_from_label_cub(attribute_name):
     
     train_data = load_cub_split('train')
     concept_vector = [i['attribute_label'][index] for i in train_data]
-    return np.array(concept_vector)
+    return np.array(concept_vector).reshape((1,len(concept_vector)))
 
 def create_tcav_cub(attribute_name,num_random_exp):
     """Helper function to create TCAV from CUB Attribute
