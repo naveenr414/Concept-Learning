@@ -101,13 +101,14 @@ def create_tcav_cub(attribute_name,num_random_exp):
     """
     
     create_folder_from_attribute(attribute_name)
+    create_random_folder_without_attribute(attribute_name,num_random_exp)
     
     concepts = [attribute_name]
     target = "zebra"
     model_name = "GoogleNet"
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
-
+    
     create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
     
 def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1]):
@@ -144,6 +145,12 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
         raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
 
     act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir, max_examples=100)
+    
+    # Remove existing TCAV vectors, so it generates new ones
+    for concept in concepts:
+        for i in range(num_random_exp):
+            tcav_file_location = "{}/{}-random500_{}-{}-linear-{}.pkl".format(cav_dir,concept,i,bottlenecks[0],alphas[0])
+            os.remove(tcav_file_location)
     
     mytcav = tcav.TCAV(sess,
                    target,
