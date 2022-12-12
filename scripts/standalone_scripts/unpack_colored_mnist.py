@@ -1,6 +1,7 @@
 import numpy as np
 from PIL import Image
 import pickle 
+import random
 
 def write_image_from_numpy_array(arr,location):
     """Turn a mxnx3 numpy array into a png image, stored at location
@@ -57,8 +58,21 @@ def create_dataset():
         label = mnist_dictionary['train_label'][i]
         
         storage_location = "colored_mnist/images/{}/{}.png".format(label,i)
-        train_dictionary.append({'img_path': storage_location, 
-                                 'class_label': label})
+        
+        info_dictionary = {'img_path': storage_location, 
+                                 'class_label': label}
+        
+        for i in range(10):
+            if label == i:
+                value = 1
+            else:
+                value = 0
+                
+            info_dictionary['{}_color'.format(i)] = value
+            info_dictionary['{}_number'.format(i)] = value
+            info_dictionary['spurious'] = random.randint(0,1)
+        
+        train_dictionary.append(info_dictionary)
         write_image_from_numpy_array(image,storage_location)
         
     pickle.dump(train_dictionary,open("colored_mnist/images/train.pkl","wb"))

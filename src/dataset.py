@@ -52,6 +52,16 @@ def load_cub_split(split_name):
     data = pickle.load(open(file_name,"rb"))
     return data
 
+def load_mnist():
+    """Load the MNIST dictionary, along with concept values from train.pkl
+    
+    Arguments: Nothing
+    
+    Returns: List of dictionaries, containing info on each colored MNIST data point"""
+    
+    file_name = "dataset/colored_mnist/images/{}.pkl".format("train")
+    return pickle.load(open(file_name,"rb"))
+
 def get_cub_images_by_attribute(attribute_name):
     """Return a list of bird image files with some attribute
     
@@ -76,6 +86,20 @@ def get_cub_images_by_attribute(attribute_name):
     filtered_image_locations = [prefix+i for i in filtered_image_locations]
     return filtered_image_locations
 
+def get_mnist_images_by_attribute(attribute_name):
+    """Return a list of MNIST image files with some attribute
+    
+    Arguments: 
+        attribute_name: One of 0_color, 0_number, or spurrious
+
+    Returns:
+        String list, with the locations of each image containing attribute
+    """
+    
+    mnist_data = load_mnist()
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 1]
+    return matching_attributes
+
 def get_cub_images_without_attribute(attribute_name):
     """Returns a list of bird image files without some attribute
     
@@ -99,24 +123,41 @@ def get_cub_images_without_attribute(attribute_name):
     locations_without_attribute = [i for i in all_image_locations if i not in locations_with_attribute]
     return locations_without_attribute
 
-def create_random_folder_without_attribute(attribute_name, num_folders, images_per_folder=50):
+def get_mnist_images_without_attribute(attribute_name):
+    """Return a list of MNIST image files without some attribute
+    
+    Arguments: 
+        attribute_name: One of 0_color, 0_number, or spurrious
+
+    Returns:
+        String list, with the locations of each image lacking the attribute
+    """
+    
+    mnist_data = load_mnist()
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 0]
+    return matching_attributes
+
+def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction, images_per_folder=50):
     """Create new folders, with each folder containing birds without a particular attribute
     
     Arguments:
         attribute_name: String that's one of the 112 CUB attributes
         num_folders: Number of folders to create; this is the 
             same as the num_random_exp variable
+        attribute_antifunction: Function that returns image locations for all iamges
+            lacking a particular attribute
+            Either get_cub_images_without_attribute or get_mnist_images_without_attribute
         images_per_folder: How many images are in each folder
     
     Returns:
         None
         
     Side Effects:
-        Creates num_folders new folders, populated with images of birds
+        Creates num_folders new folders, populated with images
             lacking a particular attribute
     """
     
-    image_locations = get_cub_images_without_attribute(attribute_name)
+    image_locations = attribute_antifunction(attribute_name)
     for folder_num in range(num_folders):
         folder_location = "dataset/images/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
@@ -128,24 +169,23 @@ def create_random_folder_without_attribute(attribute_name, num_folders, images_p
         for image in random_images:
             shutil.copy2(image,folder_location)
     
-        
-
-def create_folder_from_attribute(attribute_name):
+def create_folder_from_attribute(attribute_name,attribute_function):
     """Create a new folder, with the images being all birds with a particular attribute
     
     Arguments:
-        attribute_name: String that's one of the 112 CUB attributes
-            Such as has_bill_shape::dagger
+        attribute_name: String that's an attribute to either the MNIST dataset or the Birds Dataset
+        attribute_function: Function that retrieves all matching images, given an attribute
+            Either get_mnist_images_by_attribute or get_cub_images_by_attribute
 
     Returns:
         None
         
     Side Effects:
-        Creates a new folder, populated with images of birds
+        Creates a new folder, populated with images
             with a particular attribute
     """
     
-    image_locations = get_cub_images_by_attribute(attribute_name)
+    image_locations = attribute_function(attribute_name)
     folder_location = "dataset/images/{}".format(attribute_name)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)

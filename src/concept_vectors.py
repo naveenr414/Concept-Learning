@@ -85,6 +85,22 @@ def create_vector_from_label_cub(attribute_name):
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
+def create_vector_from_label_mnist(attribute_name):
+    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
+        This produces a 0-1 vector, with the vector <0,1,0> representing
+        the presence of the attribute in data point 1, and not present in datapoints 0, 2
+        
+    Arguments:
+        attribute_name: String representing one of the 112 CUB attributes
+
+    Returns:
+        concept_vector: Numpy vector representing the concept vector for the attribute
+    """
+    
+    mnist_data = load_mnist()    
+    concept_vector = [i[attribute_name] for i in mnist_data]
+    return np.array(concept_vector).reshape((1,len(concept_vector)))
+
 def create_tcav_cub(attribute_name,num_random_exp):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
@@ -100,8 +116,34 @@ def create_tcav_cub(attribute_name,num_random_exp):
         Trains a set of concept vectors, stored at ./results/cavs
     """
     
-    create_folder_from_attribute(attribute_name)
-    create_random_folder_without_attribute(attribute_name,num_random_exp)
+    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute)
+    
+    concepts = [attribute_name]
+    target = "zebra"
+    model_name = "GoogleNet"
+    bottlenecks = ["mixed4c"]
+    alphas = [0.1]
+    
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
+
+def create_tcav_mnist(attribute_name,num_random_exp):
+    """Helper function to create TCAV from CUB Attribute
+        It creates the folder with images for the attribute, trains the TCAV vector,
+        then deletes the folder
+    
+    Arguments:
+        attribute_name: String containing one of the 112 CUB attributes
+
+    Returns:
+        None
+        
+    Side Effects:
+        Trains a set of concept vectors, stored at ./results/cavs
+    """
+    
+    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -198,4 +240,6 @@ if __name__ == "__main__":
         create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha])
     elif args.algorithm == 'tcav_cub':
         create_tcav_cub(args.class_name,args.num_random_exp)
+    elif args.algorithm == 'tcav_mnist':
+        create_tcav_mnist(args.class_name,args.num_random_exp)
    
