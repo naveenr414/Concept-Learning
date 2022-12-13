@@ -35,7 +35,7 @@ def load_mnist_dictionary():
     
     return np.load(open("colored_mnist/mnist_10color_jitter_var_0.030.npy","rb"),allow_pickle=True,encoding='latin1').item()
 
-def create_dataset():
+def create_dataset(write_images=True):
     """Creates the dataset by writing images to files and the train.pkl dictionary, with information on 
         each data point
 
@@ -52,30 +52,50 @@ def create_dataset():
     
     mnist_dictionary = load_mnist_dictionary()
     train_dictionary = []
+    valid_dictionary = []
     
-    for i in range(len(mnist_dictionary['train_image'])):
-        image = mnist_dictionary['train_image'][i]
-        label = mnist_dictionary['train_label'][i]
-        
-        storage_location = "colored_mnist/images/{}/{}.png".format(label,i)
-        
-        info_dictionary = {'img_path': storage_location, 
-                                 'class_label': label}
-        
-        for i in range(10):
-            if label == i:
-                value = 1
-            else:
-                value = 0
+    for split in ['train','valid']:
+        image_key = '{}_image'.format(split)
+        label_key = '{}_label'.format(split)
+        for i in range(len(mnist_dictionary[image_key])):
+            image = mnist_dictionary[image_key][i]
+            label = mnist_dictionary[label_key][i]
+
+            image_number = i 
+            if split == 'valid':
+                image_number += len(mnist_dictionary['train_image'])
+
+            storage_location = "colored_mnist/images/{}/{}.png".format(label,image_number)
+
+            info_dictionary = {'img_path': storage_location, 
+                                'class_label': label, 
+                                'id': image_number}
+            attribute_label = []
+
+            
+            for j in range(10):
+                if label == j:
+                    value = 1
+                else:
+                    value = 0
+
+                info_dictionary['{}_color'.format(j)] = value
+                info_dictionary['{}_number'.format(j)] = value
                 
-            info_dictionary['{}_color'.format(i)] = value
-            info_dictionary['{}_number'.format(i)] = value
+                attribute_label.append(value)
+                attribute_label.append(value)
+            
             info_dictionary['spurious'] = random.randint(0,1)
-        
-        train_dictionary.append(info_dictionary)
-        write_image_from_numpy_array(image,storage_location)
+            attribute_label.append(info_dictionary['spurious'])
+            
+            info_dictionary['attribute_label'] = attribute_label
+            
+            train_dictionary.append(info_dictionary)
+            
+            if write_images:
+                write_image_from_numpy_array(image,storage_location)
         
     pickle.dump(train_dictionary,open("colored_mnist/images/train.pkl","wb"))
     
 if __name__ == "__main__":
-    create_dataset()
+    create_dataset(write_image = False)

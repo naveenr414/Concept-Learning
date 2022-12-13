@@ -101,7 +101,7 @@ def create_vector_from_label_mnist(attribute_name):
     concept_vector = [i[attribute_name] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_cub(attribute_name,num_random_exp):
+def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -117,7 +117,7 @@ def create_tcav_cub(attribute_name,num_random_exp):
     """
     
     create_folder_from_attribute(attribute_name,get_cub_images_by_attribute)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -127,7 +127,7 @@ def create_tcav_cub(attribute_name,num_random_exp):
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
 
-def create_tcav_mnist(attribute_name,num_random_exp):
+def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -143,7 +143,7 @@ def create_tcav_mnist(attribute_name,num_random_exp):
     """
     
     create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -192,7 +192,8 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
     for concept in concepts:
         for i in range(num_random_exp):
             tcav_file_location = "{}/{}-random500_{}-{}-linear-{}.pkl".format(cav_dir,concept,i,bottlenecks[0],alphas[0])
-            os.remove(tcav_file_location)
+            if os.path.exists(tcav_file_location):
+                os.remove(tcav_file_location)
     
     mytcav = tcav.TCAV(sess,
                    target,
@@ -230,16 +231,18 @@ if __name__ == "__main__":
                         default='mixed4c')
     parser.add_argument('--num_random_exp', type=int,
                         help='Number of random ImageNet classes we compare the concept vector with')
+    parser.add_argument('--images_per_folder',type=int, default=50,
+                        help='Number of images in each random random folder')
 
     args = parser.parse_args()
     
-    if args.algorithm not in ['tcav','tcav_cub']:
-        raise Exception("{} not implemented to generate concept vectors".format(parser.algorithm))
-    
+    if args.algorithm not in ['tcav','tcav_cub','tcav_mnist']:
+        raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
+        
     if args.algorithm == 'tcav':
         create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha])
     elif args.algorithm == 'tcav_cub':
-        create_tcav_cub(args.class_name,args.num_random_exp)
+        create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder)
     elif args.algorithm == 'tcav_mnist':
-        create_tcav_mnist(args.class_name,args.num_random_exp)
+        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder)
    

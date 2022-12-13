@@ -120,6 +120,47 @@ def generate_data_loaders_cub():
     
     return train_dl, valid_dl
 
+def generate_data_loaders_mnist():
+    """Generate the train and validation dataloaders for the MNIST dataset
+    
+    Parameters: None
+    
+    Returns: Two Things
+        train_dl: A PyTorch dataloader with data, output, and concepts
+        valid_dl: A PyTorch dataloader with data, output, and concepts
+    """
+    mnist_location = '../../main_data/dataset/colored_mnist'
+    train_data_path = mnist_location+'images/train.pkl'
+    valid_data_path = mnist_location+'images/val.pkl'
+    
+    train_dl = load_data(
+        pkl_paths=[train_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=mnist_location+'/images/',
+        resampling=False,
+        root_dir=mnist_location,
+        num_workers=num_workers,
+    )
+    
+    valid_dl = load_data(
+        pkl_paths=[valid_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=mnist_location+'/images/',
+        resampling=False,
+        root_dir=mnist_location,
+        num_workers=num_workers,
+    )
+    
+    return train_dl, valid_dl
+
 if experiment_name == "xor":
     train_dl, valid_dl = generate_data_loaders_xor()
     n_concepts = 2
@@ -129,6 +170,11 @@ elif experiment_name == "cub":
     train_dl, valid_dl = generate_data_loaders_cub()
     n_concepts = 112
     n_tasks = 200
+    
+elif experiment_name == "mnist":
+    train_dl, valid_dl = generate_data_loaders_mnist()
+    n_concepts = 10 + 10 + 1
+    n_tasks = 10
 
     
 if experiment_name == "xor":

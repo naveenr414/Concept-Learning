@@ -137,6 +137,30 @@ def get_mnist_images_without_attribute(attribute_name):
     matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 0]
     return matching_attributes
 
+def get_mnist_images_without_attribute_one_class(attribute_name):
+    """Return a list of MNIST image files without some attribute, 
+        where all images are from one class
+    
+    Arguments: 
+        attribute_name: One of 0_color, 0_number, or spurrious
+
+    Returns:
+        String list, with the locations of each image lacking the attribute
+    """
+    
+    mnist_data = load_mnist()
+    
+    # Find some random class without the attribute
+    random_class = -1
+    while random_class == -1:
+        random_datapoint = mnist_data[random.randint(0,len(mnist_data)-1)]
+        if random_datapoint[attribute_name] == 0:
+            random_class = random_datapoint['class_label']
+    
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class]
+    return matching_attributes
+
+
 def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction, images_per_folder=50):
     """Create new folders, with each folder containing birds without a particular attribute
     
