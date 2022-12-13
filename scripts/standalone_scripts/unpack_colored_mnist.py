@@ -54,7 +54,7 @@ def create_dataset(write_images=True):
     train_dictionary = []
     valid_dictionary = []
     
-    for split in ['train','valid']:
+    for split in ['train','test']:
         image_key = '{}_image'.format(split)
         label_key = '{}_label'.format(split)
         for i in range(len(mnist_dictionary[image_key])):
@@ -90,12 +90,16 @@ def create_dataset(write_images=True):
             
             info_dictionary['attribute_label'] = attribute_label
             
-            train_dictionary.append(info_dictionary)
+            if split == 'train':
+                train_dictionary.append(info_dictionary)
+            elif split == 'test':
+                valid_dictionary.append(info_dictionary)
             
             if write_images:
                 write_image_from_numpy_array(image,storage_location)
         
     pickle.dump(train_dictionary,open("colored_mnist/images/train.pkl","wb"))
+    pickle.dump(valid_dictionary,open("colored_mnist/images/valid.pkl","wb"))
     
 if __name__ == "__main__":
-    create_dataset(write_image = False)
+    create_dataset(write_images = False)

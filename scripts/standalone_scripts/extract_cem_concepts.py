@@ -11,7 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from cem.data.CUB200.cub_loader import load_data
 import numpy as np
 
-experiment_name = "cub"
+experiment_name = "mnist"
 num_gpus = 1
 num_epochs = 1
 validation_epochs = 1
@@ -180,6 +180,8 @@ elif experiment_name == "mnist":
 if experiment_name == "xor":
     extractor_arch = c_extractor_arch
 elif experiment_name == "cub":
+    extractor_arch = resnet50
+elif experiment_name == 'mnist':
     extractor_arch = resnet50
 
 cem_model = ConceptEmbeddingModel(

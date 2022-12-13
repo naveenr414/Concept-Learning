@@ -34,6 +34,23 @@ def get_cub_attributes():
     attributes = [i.split(" ")[1] for i in lines]
     return attributes
 
+def get_mnist_attributes():
+    """Get the lit of attributes used in Colored MNIST
+    This is 0_color, 0_number... and spurious 
+    
+    Arguments: None
+    
+    Returns: String list of attributes
+    """
+    
+    attributes = []
+    
+    for i in range(10):
+        attributes += ["{}_color".format(i),"{}_number".format(i)]
+
+    attributes += ["spurious"]
+    return attributes
+
 def load_cub_split(split_name):
     """Get the information on which datapoints are used for split_name
     
