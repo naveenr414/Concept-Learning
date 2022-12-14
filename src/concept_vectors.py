@@ -53,8 +53,10 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
             for file_name in all_matching_files:
                 re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(concept,bottleneck,alpha),file_name)
                 random_concept = re_search.group(1)
-                concept_meta_info.append({'alpha': alpha,'bottleneck': bottleneck, 'random_concept': random_concept, 'concept': concept})
+                concept_meta_info.append({'alpha': alpha,'bottleneck': bottleneck, 'random_concept': int(random_concept), 'concept': concept})
 
+    concept_meta_info, all_matching_files = zip(*sorted(zip(concept_meta_info,all_matching_files), key=lambda k: k[0]['random_concept']))
+                
     all_concept_vectors = []
     
     for file in all_matching_files:

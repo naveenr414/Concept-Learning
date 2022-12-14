@@ -3,6 +3,7 @@ from scipy.spatial import distance_matrix
 from scipy.spatial.distance import cosine 
 from collections import Counter
 from collections import defaultdict
+import random
 
 def create_distance_metric(vector_a,vector_b,metric):
     """Find the distance for every pair of vectors in vector_a and vector_b
@@ -33,8 +34,8 @@ def find_average_distances(vector_list,class_list,metric = None):
         vector_list: n by k matrix of vectors
         class_list: int list of length n, each index representing membership in a certain class
             number 0...r-1
-        cosine_metric: boolean that specifies whether to use cosine similarity 
-            instead of eucldiean norm to compute distance 
+        metric: Which metric should be used, such as cosine, etc. 
+            If it's None, we use the euclidean metric
         
     Returns:
         An rxr matrix with average distances between each class, where r=# of classes
@@ -65,6 +66,63 @@ def find_average_distances(vector_list,class_list,metric = None):
                 avg_distance_class[i][j]/=num_pairs
 
     return avg_distance_class
+
+def find_paired_distance(vector_list,class_list,random_list,metric = None):
+    """Given a list of vectors, each a member of a certain class, find the average distance between pairs of classes
+        Note that vectors are paired based on their 'random_concept'; we only compute distances between vectors
+        which compare with the same 'random_concept', which corresponds to the baseline class in TCAV training
+    
+    Arguments:
+        vector_list: n by k matrix of vectors
+        class_list: int list of length n, each index representing membership in a certain class
+            number 0...r-1
+        random_list: int list of length n, each index representing which random class was used
+            in the vectors computation
+        metric: Which metric should be used, such as cosine, etc. 
+            If it's None, we use the euclidean metric
+        
+    Returns:
+        An rxr matrix with average distances between each class, where r=# of classes
+    """
+    
+    if metric == None:
+        metric = lambda a,b: np.linalg.norm(a-b)
+        
+    number_by_class = Counter(class_list)
+    num_classes = len(number_by_class)
+    distances_by_class = np.zeros((num_classes,num_classes))
+    
+    vectors_by_class_random = {}
+    for i in range(num_classes):
+        vectors_by_class_random[i] = {}
+    
+    for i in range(len(vector_list)):
+        class_num = class_list[i]
+        random_num = random_list[i]
+        
+        if random_num not in vectors_by_class_random[class_num]:
+            vectors_by_class_random[class_num][random_num] = []
+
+        vectors_by_class_random[class_num][random_num].append(vector_list[i])
+
+    for i in range(num_classes):
+        for j in range(num_classes):
+            num_matches = 0
+            total_distance = 0
+            
+            for random_num in vectors_by_class_random[i]:
+                # Find all vector pairs, with (i,random_num) and (j,random_num)
+                vectors_in_i = vectors_by_class_random[i][random_num]
+                vectors_in_j = vectors_by_class_random[j][random_num]
+
+                for v_i in vectors_in_i:
+                    for v_j in vectors_in_j:
+                        num_matches += 1
+                        total_distance += metric(v_i,v_j)
+
+            distances_by_class[i][j] = total_distance/num_matches
+            
+    return distances_by_class
 
 def encode_list(class_list):
     """Encode a list of classes into a list of numbers; 

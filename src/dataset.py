@@ -140,7 +140,7 @@ def get_cub_images_without_attribute(attribute_name):
     locations_without_attribute = [i for i in all_image_locations if i not in locations_with_attribute]
     return locations_without_attribute
 
-def get_mnist_images_without_attribute(attribute_name):
+def get_mnist_images_without_attribute(attribute_name,folder_num=0):
     """Return a list of MNIST image files without some attribute
     
     Arguments: 
@@ -154,7 +154,7 @@ def get_mnist_images_without_attribute(attribute_name):
     matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 0]
     return matching_attributes
 
-def get_mnist_images_without_attribute_one_class(attribute_name):
+def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
     """Return a list of MNIST image files without some attribute, 
         where all images are from one class
     
@@ -168,13 +168,12 @@ def get_mnist_images_without_attribute_one_class(attribute_name):
     mnist_data = load_mnist()
     
     # Find some random class without the attribute
-    random_class = -1
-    while random_class == -1:
-        random_datapoint = mnist_data[random.randint(0,len(mnist_data)-1)]
-        if random_datapoint[attribute_name] == 0:
-            random_class = random_datapoint['class_label']
+    random_class = folder_num % 10 
     
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class]
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class and i[attribute_name] == 0]
+    if len(matching_attributes) == 0:
+        matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class] 
+    
     return matching_attributes
 
 
@@ -198,8 +197,8 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
             lacking a particular attribute
     """
     
-    image_locations = attribute_antifunction(attribute_name)
     for folder_num in range(num_folders):
+        image_locations = attribute_antifunction(attribute_name,folder_num)
         folder_location = "dataset/images/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
             os.mkdir(folder_location)

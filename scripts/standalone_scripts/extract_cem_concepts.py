@@ -129,9 +129,9 @@ def generate_data_loaders_mnist():
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    mnist_location = '../../main_data/dataset/colored_mnist'
-    train_data_path = mnist_location+'images/train.pkl'
-    valid_data_path = mnist_location+'images/val.pkl'
+    mnist_location = '../../main_code/dataset/colored_mnist'
+    train_data_path = mnist_location+'/images/train.pkl'
+    valid_data_path = mnist_location+'/images/val.pkl'
     
     train_dl = load_data(
         pkl_paths=[train_data_path],

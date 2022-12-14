@@ -99,7 +99,7 @@ def create_dataset(write_images=True):
                 write_image_from_numpy_array(image,storage_location)
         
     pickle.dump(train_dictionary,open("colored_mnist/images/train.pkl","wb"))
-    pickle.dump(valid_dictionary,open("colored_mnist/images/valid.pkl","wb"))
+    pickle.dump(valid_dictionary,open("colored_mnist/images/val.pkl","wb"))
     
 if __name__ == "__main__":
     create_dataset(write_images = False)
