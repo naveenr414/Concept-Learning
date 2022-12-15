@@ -145,7 +145,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
     """
     
     create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
+    #create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -154,6 +154,50 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
     alphas = [0.1]
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
+
+def load_activations_tcav(attribute_list):
+    """From a list of concepts or attributes, generate their representation in some model
+        such as GoogleNet, at some bottleneck layer
+        
+    Arguments:
+        attribute_list: String list of concepts to be analyzed, such as 'zebra'
+
+    Returns:
+        Dictionary: Each key is an attribute, and each value is a numpy array of size 
+            n x 100K, where n is the number of concept vectors, and 100K is the size of the 
+            bottleneck
+    """
+    
+    cav_dir = './results/cavs'
+    activation_dir = './results/activations'
+    working_dir = './results/tmp'
+    image_dir = "./dataset/images"
+    model_name = "GoogleNet"
+    
+    sess = utils.create_session()
+    if model_name == "GoogleNet":
+        GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
+        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+        mymodel = model.GoogleNetWrapper_public(sess,
+                                            GRAPH_PATH,
+                                            LABEL_PATH)
+    else:
+        raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
+
+    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=500)
+    
+    bottlenecks = ["mixed4c"]
+    
+    acts = {}
+    for i in attribute_list:
+        examples = act_generator.get_examples_for_concept(i)
+        activation_examples = act_generator.model.run_examples(examples, bottlenecks[0])
+        acts[i] = activation_examples
+        shape = acts[i].shape
+        acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
+        print("Activation {} is shape {}".format(i,acts[i].shape))
+    
+    return acts
     
 def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1]):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target

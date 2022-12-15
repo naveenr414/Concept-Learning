@@ -109,3 +109,36 @@ def plot_pca(data,labels=[],filter_labels=None):
     
     X_embedded = PCA(n_components=2).fit_transform(data)
     scatter_labels(X_embedded,labels,filter_labels)
+    
+def generate_labels_from_activation(concept_list,activation):
+    """From a list of concepts, generate the labels when performing scatter plots
+        using these concepts, so that each concept appears #concept vectors times
+
+    Arguments:
+        concept_list: String list of concepts, which will be analyzed
+        activation: Dictionary, which says how many concept vectors are present for each
+            concept (in the form of a numpy array containing all concepts)
+
+    Returns:
+        String list, with concepts repeated n times, where n is the number of concept vectors
+        
+    Example: generate_labels_from_activation(['hello','goodbye'],{'hello': 2x100 list, 'goodbye': 3x100 list})
+        Returns: ['hello','hello','goodbye','goodbye','goodbye']
+    """
+    
+    return_list = []
+    for i in concept_list:
+        return_list += [i for j in range(len(activation[i]))]
+    
+    return return_list
+
+def plot_arrows(origins,arrows):
+    """Plot a series of arrows, originating at each origin (an nx2 matrix) and 
+        ending at each endpoint in arrows (another nx2 matrix) 
+        
+    Arguments:
+        origins: A numpy array of where each arrow starts from
+        arrows: A numpy array of where each arrow ends
+    """
+    
+    plt.quiver(origins[:,0],origins[:,1], arrows[:,0], arrows[:,1], color=color_palette, scale=21)

@@ -180,4 +180,41 @@ def aggregate_by_class(vector_list,concept_list,aggregation_function):
         ret_vector.append(aggregation_function(vector_by_class[concept]))
 
     return np.array(ret_vector)
+
+def find_vectors_with_data(concept_vectors, concept_metadata, desired_metadata):
+    """Find a list of concept vectors where concept metadata matches the desired metadata
+
+    Arguments:
+        concept_vectors: List of n concept vectors, as a numpy array
+        concept_metadata: List of n dictionaries, with information on which concept it's for
+            and which random_concept it was trained against
+        desired_metadata: List of k dictionaries, with information on which vectors we want
+        
+    Returns:
+        Numpy array of k concept vectors, corresponding to the vectors we want
+    """
     
+    return_vectors = []
+    
+    for metadata_i in desired_metadata:
+        for j,metadata_j in enumerate(concept_metadata):
+            for key in metadata_i:
+                if metadata_j[key] != metadata_i[key]:
+                    break
+            else:
+                return_vectors.append(concept_vectors[j])
+                break
+
+    return np.array(return_vectors)
+
+def get_center(data):
+    """Return the center of a set of n vectors in R^k
+    
+    Arguments: 
+        Data: A numpy array of size nxk
+    
+    Returns: 
+        A vector corresponding to the mean, of size 1xk
+    """
+    
+    return np.mean(data,axis=0)
