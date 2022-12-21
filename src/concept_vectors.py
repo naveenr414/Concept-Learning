@@ -145,7 +145,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
     """
     
     create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute)
-    #create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
     
     concepts = [attribute_name]
     target = "zebra"

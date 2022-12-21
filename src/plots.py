@@ -4,6 +4,7 @@ import scipy
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from collections import defaultdict
+from scipy.cluster.hierarchy import dendrogram
 
 color_palette = ['#377eb8', '#ff7f00', '#4daf4a',
                   '#f781bf', '#a65628']
@@ -142,3 +143,19 @@ def plot_arrows(origins,arrows):
     """
     
     plt.quiver(origins[:,0],origins[:,1], arrows[:,0], arrows[:,1], color=color_palette, scale=21)
+    
+def plot_dendogram(tree_info,labels):
+    """Plot a tree diagram for a hierarchal cluster
+    
+    Arguments: 
+        tree_info: Numpy array arising from a call to the sklearn hierarchal clustering method
+        labels: Label for each vector whihc is clustered
+
+    Returns: Nothing
+    
+    Side Effects: Plots Tree Diagram/dendogram
+    """
+    
+    labels = [i[:20] for i in labels]
+    plt.figure(figsize =(15,7))
+    dendrogram(tree_info,labels=labels,orientation='right',distance_sort='descending') 

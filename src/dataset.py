@@ -103,6 +103,24 @@ def get_cub_images_by_attribute(attribute_name):
     filtered_image_locations = [prefix+i for i in filtered_image_locations]
     return filtered_image_locations
 
+def get_cub_classes_by_attribute(attribute_name):
+    """Return a list of CUB bird types that have a particular attribute
+    Note that, because of the CUB data collection method, all birds in a particular class
+    have the same attributes
+    
+    Arguments: 
+        attribute_name: One of the 112 attributes.txt
+        
+    Returns:
+        String list, with the name of bird types
+    """
+    
+    image_locations = get_cub_images_by_attribute(attribute_name)
+    bird_types = [i.split("/")[5].split(".")[1].replace("_"," ") for i in image_locations]
+    
+    return sorted(list(set(bird_types)))
+    
+
 def get_mnist_images_by_attribute(attribute_name):
     """Return a list of MNIST image files with some attribute
     
