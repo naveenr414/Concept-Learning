@@ -16,6 +16,9 @@ def test_hierarchy_class():
     assert h.root_split.left_split != None
     assert h.root_split.right_split != None
     
+    assert len(str(h)) > 0
+    assert len(str(h).split("\n")) > 5
+    
 def test_hierarchy_methods():
     random_vectors = np.random.random((5,6))
     

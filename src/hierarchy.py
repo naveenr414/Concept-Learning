@@ -33,6 +33,41 @@ class Split:
         self.right_split = right_split
         self.split_height = split_height 
 
+    def print_split(self,split,spaces = ""):
+        """Recursive function to print out a split horizontally
+        
+        Arguments: 
+            split: Object from the split class to print
+            spaces: Optional Argument that says how far to tab in 
+                each value; this increases as you 
+                go further down the dendrogram
+
+        Returns: 
+            String value of the split
+        """
+        
+        if split.leaf:
+            ret = spaces+" ---- "+split.value[0]+"\n"
+        else:
+            ret = self.print_split(split.left_split,spaces+" "*5)
+            ret += spaces + " ----|"
+            ret += "\n"
+            ret += self.print_split(split.right_split,spaces+" "*5)
+            ret += "\n"
+            
+        return ret
+    
+    def __str__(self):
+        """Creates a string version of the split, as a dendrogram
+        
+        Arguments: Nothing
+        
+        Returns: String version of the split
+        """
+        
+        return self.print_split(self)
+
+        
 class Hierarchy:
     """Stores a root split, and uses that to convert Hierarchies into numpy arrays and vice-versa
         This class is useful to investigate and print hierarchies, and also to compute distances
@@ -160,7 +195,7 @@ class Hierarchy:
             If dendogram is large, then we encourage saving it to a file         
         """
         
-        return ""
+        return str(self.root_split).strip("\n")
 
 def create_ward_hierarchy(data,metric='euclidean'):
     """Use the sklearn ward function to construct a hierarchal cluster
