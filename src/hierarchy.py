@@ -3,6 +3,8 @@ from sklearn.cluster import AgglomerativeClustering
 from scipy.spatial.distance import pdist, cdist
 from scipy.sparse.csgraph import minimum_spanning_tree
 import numpy as np
+from zss import simple_distance, Node
+
 
 class Split:
     """Class that captures a split in a dendogram. 
@@ -57,6 +59,21 @@ class Split:
             
         return ret
     
+    def to_node(self):
+        """Return a Node object from the zss library, using concept names as the values
+        
+        Arguments: Nothing
+        
+        Returns: Node object from the zss library"""
+        
+        if self.leaf:
+            return Node(self.value[0])
+        n = Node(" ".join(self.value))
+        n.addkid(self.left_split.to_node())
+        n.addkid(self.right_split.to_node())
+        
+        return n
+    
     def __str__(self):
         """Creates a string version of the split, as a dendrogram
         
@@ -76,7 +93,7 @@ class Hierarchy:
         root_split: Split that contains information on all other splits
     """
     
-    def __init__(self,root_split):
+    def __init__(self,root_split=None):
         self.root_split = root_split
         
     def from_array(self,arr,baseline_concepts):
@@ -169,7 +186,7 @@ class Hierarchy:
             split_len = len(value)
             ret_matrix.append([left_split_num,right_split_num,split_height,split_len])
             
-        return ret_matrix
+        return ret_matrix        
         
     def distance(self,other_hierarchy):
         """Distance from one hierarchy to another. 
@@ -183,7 +200,10 @@ class Hierarchy:
         
         """
         
-        return 0.0
+        our_node = self.root_split.to_node()
+        their_node = other_hierarchy.root_split.to_node()
+        
+        return simple_distance(our_node,their_node)
         
     def __str__(self):
         """Convert a hierarchy into a printable string
