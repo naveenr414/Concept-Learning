@@ -11,8 +11,9 @@ import re
 import argparse
 from src.dataset import *
 import random
+import glob
 
-def load_cem_vectors(experiment_name,concept_number):
+def load_cem_vectors(experiment_name,concept_number,seed=-1):
     """Load all the 'active' embeddings from Concept Embedding Models
     
     Arguments:
@@ -26,10 +27,18 @@ def load_cem_vectors(experiment_name,concept_number):
     """
     dataset_location = "results/cem_concepts"
     
-    file_location = dataset_location + "/{}_concept_{}_active.npy".format(experiment_name,concept_number)
+    if seed == -1:
+        all_seeds = get_seed_numbers(dataset_location+"/"+experiment_name)
+        if len(all_seeds) == 0:
+            raise Exception("No experiments found at "+dataset_location+"/{}/".format(experiment_name))
+        
+        seed = random.choice(all_seeds)
+    
+    file_location = dataset_location + "/{}/{}".format(experiment_name,seed)
+    file_location+="/{}_concept_{}_active.npy".format(experiment_name,concept_number)
     return np.load(open(file_location,"rb"))
 
-def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
+def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alphas=[0.1]):
     """Loads all the TCAV vectors for a given concept + bottleneck combination
     
     Arguments:
@@ -42,7 +51,7 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
             Numpy array of size (k,n), where k = number of concepts vectors, and n = size of the bottleneck
             List of size k, with metadata on each concept (the random comparison, alpha used, bottleneck)
     """
-    dataset_location = "./results/cavs"
+    dataset_location = "./results/cavs/{}/{}".format(experiment_name,seed)
     all_matching_files = [] 
     concept_meta_info = []
     
@@ -116,7 +125,7 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
         None
         
     Side Effects:
-        Trains a set of concept vectors, stored at ./results/cavs
+        Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
     create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed)
@@ -128,7 +137,7 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=seed)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed)
 
 def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     """Helper function to create TCAV from CUB Attribute
@@ -142,7 +151,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
         None
         
     Side Effects:
-        Trains a set of concept vectors, stored at ./results/cavs
+        Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
     create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed)
@@ -154,9 +163,9 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=seed)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist",alphas=[0.1],seed=seed)
 
-def load_activations_tcav(attribute_list):
+def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
         
@@ -169,7 +178,7 @@ def load_activations_tcav(attribute_list):
             bottleneck
     """
     
-    cav_dir = './results/cavs'
+    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
     activation_dir = './results/activations'
     working_dir = './results/tmp'
     image_dir = "./dataset/images"
@@ -200,7 +209,7 @@ def load_activations_tcav(attribute_list):
     
     return acts
     
-def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=-1):
+def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     
     Arguments:
@@ -218,14 +227,19 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
         Trains a set of concept_vectors stored at ./results/cavs
     """
     
-    if seed > -1:
-        np.random.seed(seed)
-        random.seed(seed)
+    if seed == -1:
+        seed = random.randint(0,100000)
     
-    cav_dir = './results/cavs'
+    np.random.seed(seed)
+    random.seed(seed)
+    
+    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
     activation_dir = './results/activations'
     working_dir = './results/tmp'
     image_dir = "./dataset/images"
+    
+    if not os.path.exists(cav_dir):
+        os.makedirs(cav_dir)
     
     sess = utils.create_session()
     if model_name == "GoogleNet":

@@ -35,4 +35,4 @@ def test_attribute_folders():
     
 if __name__ == "__main__":
     test_cub()
-    test_attribute_folders()
+    #test_attribute_folders()

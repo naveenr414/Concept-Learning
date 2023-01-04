@@ -19,8 +19,8 @@ def test_tcav_cub():
     
     assert len(get_cub_images_by_attribute(all_attributes[10])) > 0
     
-    assert create_tcav_cub(all_attributes[0],2) == None
-    assert os.path.exists("./results/cavs/{}-random500_0-mixed4c-linear-0.1.pkl".format(all_attributes[0]))
+    assert create_tcav_cub(all_attributes[0],2,seed=42) == None
+    assert os.path.exists("./results/cavs/cub/42/{}-random500_0-mixed4c-linear-0.1.pkl".format(all_attributes[0]))
     
 def test_cem():
     assert len(load_cem_vectors("xor",0))>0
@@ -29,7 +29,7 @@ def test_cem():
     xor_concepts = {}
     for i in [0,1]:
         for j in ["active","inactive"]:
-            xor_concepts["{}_{}".format(i,j)] = np.load("./results/cem_concepts/xor_concept_{}_{}.npy".format(i,j))
+            xor_concepts["{}_{}".format(i,j)] = np.load("./results/cem_concepts/xor/42/xor_concept_{}_{}.npy".format(i,j))
 
     assert len(xor_concepts['0_active']) + len(xor_concepts['0_inactive']) ==  \
         len(xor_concepts['1_active']) + len(xor_concepts['1_inactive']) 
@@ -47,16 +47,16 @@ def test_tcav():
     if not os.path.exists("./dataset/random500_0") or len(os.listdir("./dataset/images/random500_0")) == 0:
         assert download_random_imagenet_classes(1,10) == None
     
-    assert create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=alphas) == None
+    assert create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=alphas,experiment_name="unfiled",seed=42) == None
     
-    assert os.path.exists("./results/cavs/soccer-random500_0-mixed4c-linear-0.1.pkl")
-    assert os.path.exists("./results/cavs/alga-random500_0-mixed4c-linear-0.1.pkl")
+    assert os.path.exists("./results/cavs/unfiled/42/soccer-random500_0-mixed4c-linear-0.1.pkl")
+    assert os.path.exists("./results/cavs/unfiled/42/alga-random500_0-mixed4c-linear-0.1.pkl")
     
-    soccer_tcav, soccer_metadata = load_tcav_vectors("soccer",bottlenecks)
+    soccer_tcav, soccer_metadata = load_tcav_vectors("soccer",bottlenecks,experiment_name="unfiled",seed=42)
     assert soccer_tcav.shape[0] == 2
     assert soccer_tcav.shape[1] > 100
 
-    alga_tcav, alga_metadata = load_tcav_vectors("alga",bottlenecks)
+    alga_tcav, alga_metadata = load_tcav_vectors("alga",bottlenecks,experiment_name="unfiled",seed=42)
     assert alga_tcav.shape[0] == 2
     assert alga_tcav.shape[1] > 100
     

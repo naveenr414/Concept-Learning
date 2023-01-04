@@ -212,7 +212,8 @@ if __name__ == "__main__":
       optimizer="adam",
       c_extractor_arch=extractor_arch, # Replace this appropriately
       training_intervention_prob=0.25, # RandInt probability
-      experiment_name=experiment_name
+      experiment_name=experiment_name, 
+      seed=seed
     )
     
     trainer = pl.Trainer(

@@ -4,7 +4,21 @@ import os
 import shutil
 from pathlib import Path
 import random
+import glob
 
+def get_seed_numbers(folder_location):
+    """Get all sub-directory names in a folder; used typically to find which seeds were used for an experiment
+    
+    Arguments: 
+        folder_location: String representing hte location of the directory
+        
+    Returns: 
+        List of Strings, representing sub-folders
+    """
+    all_seeds = glob.glob(folder_location+"/*")
+    
+    return [i.split("/")[-1] for i in all_seeds]
+    
 def delete_files_in_directory(directory_name):
     """Delete all files in a directory (non-recursive)
     
@@ -146,11 +160,12 @@ def get_mnist_images_by_attribute(attribute_name):
     matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 1]
     return matching_attributes
 
-def get_cub_images_without_attribute(attribute_name):
+def get_cub_images_without_attribute(attribute_name,folder_num=0):
     """Returns a list of bird image files without some attribute
     
     Arguments:
         attribute_name: One of the 112 attributes in attributes.txt
+        folder_num: Optional, unused parameter which can allow us to specify which images without attribute we're taking
 
     Returns:
         String list, with the locations of each image without the attribute
