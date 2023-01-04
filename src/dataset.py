@@ -51,11 +51,12 @@ def get_mnist_attributes():
     attributes += ["spurious"]
     return attributes
 
-def load_cub_split(split_name):
+def load_cub_split(split_name,seed=-1):
     """Get the information on which datapoints are used for split_name
     
     Arguments:
         split_name: Either train, val, or test
+        seed: Optional random number that sets the order of data
         
     Returns:
         List of Dictionaries, which contain information on data for 
@@ -67,18 +68,28 @@ def load_cub_split(split_name):
 
     file_name = "dataset/CUB/preprocessed/{}.pkl".format(split_name)
     data = pickle.load(open(file_name,"rb"))
+    
+    if seed>-1:
+        random.seed(seed)
+    random.shuffle(data)
+    
     return data
 
-def load_mnist():
+def load_mnist(seed=-1):
     """Load the MNIST dictionary, along with concept values from train.pkl
     
-    Arguments: Nothing
+    Arguments: Seed: Optional number that changes the order of data
     
     Returns: List of dictionaries, containing info on each colored MNIST data point"""
     
     file_name = "dataset/colored_mnist/images/{}.pkl".format("train")
-    return pickle.load(open(file_name,"rb"))
-
+    data = pickle.load(open(file_name,"rb"))
+    
+    if seed > -1:
+        random.seed(seed)
+    random.shuffle(data)
+    return data
+    
 def get_cub_images_by_attribute(attribute_name):
     """Return a list of bird image files with some attribute
     
@@ -195,7 +206,7 @@ def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
     return matching_attributes
 
 
-def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction, images_per_folder=50):
+def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction, images_per_folder=50,seed=-1):
     """Create new folders, with each folder containing birds without a particular attribute
     
     Arguments:
@@ -215,6 +226,9 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
             lacking a particular attribute
     """
     
+    if seed > -1:
+        random.seed(seed)
+    
     for folder_num in range(num_folders):
         image_locations = attribute_antifunction(attribute_name,folder_num)
         folder_location = "dataset/images/random500_{}".format(folder_num)
@@ -227,7 +241,7 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
         for image in random_images:
             shutil.copy2(image,folder_location)
     
-def create_folder_from_attribute(attribute_name,attribute_function):
+def create_folder_from_attribute(attribute_name,attribute_function,seed=-1):
     """Create a new folder, with the images being all birds with a particular attribute
     
     Arguments:
@@ -242,6 +256,9 @@ def create_folder_from_attribute(attribute_name,attribute_function):
         Creates a new folder, populated with images
             with a particular attribute
     """
+    
+    if seed > -1:
+        random.seed(seed)
     
     image_locations = attribute_function(attribute_name)
     folder_location = "dataset/images/{}".format(attribute_name)

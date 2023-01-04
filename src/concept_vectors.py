@@ -10,6 +10,7 @@ import pickle
 import re
 import argparse
 from src.dataset import *
+import random
 
 def load_cem_vectors(experiment_name,concept_number):
     """Load all the 'active' embeddings from Concept Embedding Models
@@ -66,7 +67,7 @@ def load_tcav_vectors(concept,bottlenecks,alphas=[0.1]):
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
-def create_vector_from_label_cub(attribute_name):
+def create_vector_from_label_cub(attribute_name,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
         the presence of the attribute in data point 1, and not present in datapoints 0, 2
@@ -83,11 +84,11 @@ def create_vector_from_label_cub(attribute_name):
         raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
     index = all_attributes.index(attribute_name)
     
-    train_data = load_cub_split('train')
+    train_data = load_cub_split('train',seed=seed)
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_vector_from_label_mnist(attribute_name):
+def create_vector_from_label_mnist(attribute_name,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
         the presence of the attribute in data point 1, and not present in datapoints 0, 2
@@ -99,11 +100,11 @@ def create_vector_from_label_mnist(attribute_name):
         concept_vector: Numpy vector representing the concept vector for the attribute
     """
     
-    mnist_data = load_mnist()    
+    mnist_data = load_mnist(seed)    
     concept_vector = [i[attribute_name] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50):
+def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -118,8 +119,8 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50):
         Trains a set of concept vectors, stored at ./results/cavs
     """
     
-    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder)
+    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder,seed=seed)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -127,9 +128,9 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50):
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=seed)
 
-def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
+def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -144,8 +145,8 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
         Trains a set of concept vectors, stored at ./results/cavs
     """
     
-    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder)
+    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder,seed=seed)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -153,7 +154,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50):
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1])
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=seed)
 
 def load_activations_tcav(attribute_list):
     """From a list of concepts or attributes, generate their representation in some model
@@ -199,7 +200,7 @@ def load_activations_tcav(attribute_list):
     
     return acts
     
-def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1]):
+def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,alphas=[0.1],seed=-1):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     
     Arguments:
@@ -216,6 +217,10 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,al
     Side Effects:
         Trains a set of concept_vectors stored at ./results/cavs
     """
+    
+    if seed > -1:
+        np.random.seed(seed)
+        random.seed(seed)
     
     cav_dir = './results/cavs'
     activation_dir = './results/activations'

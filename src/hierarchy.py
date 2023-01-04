@@ -69,8 +69,14 @@ class Split:
         if self.leaf:
             return Node(self.value[0])
         n = Node(" ".join(self.value))
-        n.addkid(self.left_split.to_node())
-        n.addkid(self.right_split.to_node())
+        
+        if self.left_split.value[0] < self.right_split.value[0]:
+            n.addkid(self.left_split.to_node())
+            n.addkid(self.right_split.to_node())
+        else:
+            n.addkid(self.right_split.to_node())
+            n.addkid(self.left_split.to_node())
+
         
         return n
     

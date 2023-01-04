@@ -10,12 +10,7 @@ from experiments.synthetic_datasets_experiments import generate_xor_data
 from torch.utils.data import TensorDataset, DataLoader
 from cem.data.CUB200.cub_loader import load_data
 import numpy as np
-
-experiment_name = "mnist"
-num_gpus = 1
-num_epochs = 1
-validation_epochs = 1
-num_workers = 16
+import argparse
 
 def retrieve_selected_concepts():
     """The CBM and CEM papers use a subset of the main birds concept
@@ -36,7 +31,6 @@ def retrieve_selected_concepts():
     indexes = [i-1 for i in indexes]
     return indexes
 
-selected_concepts = retrieve_selected_concepts()
 
 def c_extractor_arch(output_dim):
     """A feedforward architecture used before concept extraction 
@@ -161,46 +155,71 @@ def generate_data_loaders_mnist():
     
     return train_dl, valid_dl
 
-if experiment_name == "xor":
-    train_dl, valid_dl = generate_data_loaders_xor()
-    n_concepts = 2
-    n_tasks = 2
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate CEM Concept Vectors')
+    parser.add_argument('--experiment_name', type=str,
+                        help='Name of the experiment we plan to run. Valid names include mnist, cub, and xor' )
+    parser.add_argument('--num_gpus',type=int,
+                        help='Number of GPUs to use when training',
+                        default=0)
+    parser.add_argument('--num_epochs',type=int,default=1,help='How many epochs to train for')
+    parser.add_argument('--validation_epochs',type=int,default=1,help='How often should we run the validation script')
+    parser.add_argument('--seed',type=int,default=42,help='Random seed for training')
 
-elif experiment_name == "cub":
-    train_dl, valid_dl = generate_data_loaders_cub()
-    n_concepts = 112
-    n_tasks = 200
+    args = parser.parse_args()
+    experiment_name = args.experiment_name
+    num_gpus = args.num_gpus
+    num_epochs = args.num_epochs
+    validation_epochs = args.validation_epochs
+    seed = args.seed
+    num_workers = 16
+
+    pl.seed_everything(args.seed, workers=True)
+    selected_concepts = retrieve_selected_concepts()
+
+    if experiment_name == "xor":
+        train_dl, valid_dl = generate_data_loaders_xor()
+        n_concepts = 2
+        n_tasks = 2
+
+    elif experiment_name == "cub":
+        train_dl, valid_dl = generate_data_loaders_cub()
+        n_concepts = 112
+        n_tasks = 200
+
+    elif experiment_name == "mnist":
+        train_dl, valid_dl = generate_data_loaders_mnist()
+        n_concepts = 10 + 10 + 1
+        n_tasks = 10
     
-elif experiment_name == "mnist":
-    train_dl, valid_dl = generate_data_loaders_mnist()
-    n_concepts = 10 + 10 + 1
-    n_tasks = 10
+    else:
+        print("{} is not a valid experiment name".format(experiment_name))
 
+
+    if experiment_name == "xor":
+        extractor_arch = c_extractor_arch
+    elif experiment_name == "cub":
+        extractor_arch = resnet50
+    elif experiment_name == 'mnist':
+        extractor_arch = resnet50
+
+    cem_model = ConceptEmbeddingModel(
+      n_concepts=n_concepts, # Number of training-time concepts
+      n_tasks=n_tasks, # Number of output labels
+      emb_size=16,
+      concept_loss_weight=0.1,
+      learning_rate=0.01,
+      optimizer="adam",
+      c_extractor_arch=extractor_arch, # Replace this appropriately
+      training_intervention_prob=0.25, # RandInt probability
+      experiment_name=experiment_name
+    )
     
-if experiment_name == "xor":
-    extractor_arch = c_extractor_arch
-elif experiment_name == "cub":
-    extractor_arch = resnet50
-elif experiment_name == 'mnist':
-    extractor_arch = resnet50
+    trainer = pl.Trainer(
+        gpus=num_gpus,
+        max_epochs=num_epochs,
+        check_val_every_n_epoch=validation_epochs,
+    )
 
-cem_model = ConceptEmbeddingModel(
-  n_concepts=n_concepts, # Number of training-time concepts
-  n_tasks=n_tasks, # Number of output labels
-  emb_size=16,
-  concept_loss_weight=0.1,
-  learning_rate=0.01,
-  optimizer="adam",
-  c_extractor_arch=extractor_arch, # Replace this appropriately
-  training_intervention_prob=0.25, # RandInt probability
-  experiment_name=experiment_name
-)
-
-trainer = pl.Trainer(
-    gpus=num_gpus,
-    max_epochs=num_epochs,
-    check_val_every_n_epoch=validation_epochs,
-)
-
-trainer.fit(cem_model, train_dl, valid_dl)
-cem_model.write_concepts()
+    trainer.fit(cem_model, train_dl, valid_dl)
+    cem_model.write_concepts()
