@@ -51,6 +51,12 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
             Numpy array of size (k,n), where k = number of concepts vectors, and n = size of the bottleneck
             List of size k, with metadata on each concept (the random comparison, alpha used, bottleneck)
     """
+    if seed == -1:
+        seed = get_seed_numbers("./results/cavs/{}".format(experiment_name))
+        if len(seed) == 0:
+            raise Exception("No CAVs found at {}".format("./results/cavs/{}".format(experiment_name)))
+        seed = random.choice(seed)
+    
     dataset_location = "./results/cavs/{}/{}".format(experiment_name,seed)
     all_matching_files = [] 
     concept_meta_info = []
@@ -64,6 +70,9 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
                 re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(concept,bottleneck,alpha),file_name)
                 random_concept = re_search.group(1)
                 concept_meta_info.append({'alpha': alpha,'bottleneck': bottleneck, 'random_concept': int(random_concept), 'concept': concept})
+                
+    if len(concept_meta_info) == 0:
+        raise Exception("No CAVs found at {}".format(dataset_location))
 
     concept_meta_info, all_matching_files = zip(*sorted(zip(concept_meta_info,all_matching_files), key=lambda k: k[0]['random_concept']))
                 
@@ -279,6 +288,62 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
 
     mytcav.run(run_parallel=False)
 
+def load_tcav_vectors_simple(attribute,dataset,seed=-1):
+    """Simplified call to load_tcav_vectors that is standardized across embeddings
+    
+    Arguments:
+        attribute: Which TCAV concept we're looking to get vectors for, as a string
+        dataset: String which is either mnist or cub
+    
+    Returns: 
+        Numpy array of TCAV vectors
+    """
+    
+    if dataset == 'cub':
+        return load_tcav_vectors(attribute,['mixed4c'],experiment_name='cub',seed=seed)[0]
+    elif dataset == 'mnist':
+        return load_tcav_vectors(attribute,['mixed4c'],experiment_name='mnist',seed=seed)[0]
+
+def load_label_vectors_simple(attribute,dataset,seed=-1):
+    """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
+    
+    Arguments:
+        attribute: Which concept we're looking to get vectors for, as a string
+        dataset: String which is either mnist or cub
+    
+    Returns: 
+        Numpy array of label-based vectors
+    """
+    
+    if dataset == 'cub':
+        vector = create_vector_from_label_cub(attribute,seed=seed)
+    elif dataset == 'mnist':
+        vector = create_vector_from_label_mnist(attribute,seed=seed)
+        
+    return np.array(vector)
+
+def load_cem_vectors_simple(attribute,dataset,seed=-1):
+    """Simplified call to create vector from cub/mnist that is standardized across embeddings
+    
+    Arguments:
+        attribute: Which concept we're looking to get vectors for, as a string
+        dataset: String which is either mnist or cub
+    
+    Returns: 
+        Numpy array of label-based vectors
+    """
+    
+    if dataset == 'cub':
+        all_attributes = get_cub_attributes()
+    elif dataset == 'mnist':
+        all_attributes = get_mnist_attributes()
+    elif dataset == 'xor':
+        all_attributes = ['0','1']
+        
+    attribute_index = all_attributes.index(attribute)
+        
+    return load_cem_vectors(dataset,attribute_index,seed)
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
     parser.add_argument('--algorithm',type=str,
