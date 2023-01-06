@@ -23,7 +23,7 @@ class Split:
       
     
     def __init__(self,split_height,left_split,right_split,value=None):
-        if split_height == 0:
+        if split_height == 0 and left_split == None and right_split == None:
             self.leaf = True
             self.value = [value]
 
@@ -115,6 +115,8 @@ class Hierarchy:
         
         Side Effects: Sets the data from arr to be in root_split
         """
+        
+        arr[:,2] += .01
         
         split_list = []
                 
