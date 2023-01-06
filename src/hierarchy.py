@@ -4,7 +4,7 @@ from scipy.spatial.distance import pdist, cdist
 from scipy.sparse.csgraph import minimum_spanning_tree
 import numpy as np
 from zss import simple_distance, Node
-
+import sklearn
 
 class Split:
     """Class that captures a split in a dendogram. 
@@ -222,7 +222,7 @@ class Hierarchy:
         """
         
         return str(self.root_split).strip("\n")
-
+    
 def create_ward_hierarchy(data,metric='euclidean'):
     """Use the sklearn ward function to construct a hierarchal cluster
     
@@ -233,8 +233,7 @@ def create_ward_hierarchy(data,metric='euclidean'):
         numpy array with information on how to construct a dendogram
     """
     
-    dist = pdist(data,metric=metric)
-    return ward(dist)
+    return ward(data)
 
 def create_linkage_hierarchy(data,method='single',metric='euclidean'):
     """Use the sklearn linkage function to construct a hierarchal cluster
@@ -297,3 +296,42 @@ def create_hierarchy_thresholding(data,metric='euclidean'):
         current_num += 1
         
     return return_matrix
+
+def create_hierarchy(hierarchy_method, embedding_method, dataset,attributes,random_seed):
+    """Create a hierarchy from a set of embeddings and a dataset
+    Do this by first creating a distance matrix (pdist-style), then feeding it into hierarchy_method
+    
+    Arguments:
+        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
+        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+            Simply loads embeddings, does not train them from scratch 
+        dataset: String representing which dataset we're using, such as "cub"
+        attributes: List of attributes we want to create embeddings for
+        random_seed: Number representing the random seed for the embeddings
+        
+    Returns:
+        Hierarchy from the Hierarchy class
+    """
+    
+    distance_matrix = []
+    
+    embeddings_by_attribute = {}
+    for attribute in attributes:
+        embeddings = embedding_method(attribute,dataset,seed=random_seed)
+        embeddings_by_attribute[attribute] = embeddings
+        
+    for i in range(len(attributes)):
+        for j in range(i+1,len(attributes)):
+            embeddings_i = embeddings_by_attribute[attributes[i]]
+            embeddings_j = embeddings_by_attribute[attributes[j]]
+            
+            all_pairwise_distances = sklearn.metrics.pairwise_distances(embeddings_i,embeddings_j)
+            distance = np.mean(all_pairwise_distances)
+            distance_matrix.append(distance)
+    
+    distance_matrix = np.array(distance_matrix)
+    dendrogram = hierarchy_method(distance_matrix)
+    h = Hierarchy()
+    h.from_array(dendrogram,attributes)
+    
+    return h

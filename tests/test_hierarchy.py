@@ -1,5 +1,6 @@
 from src.hierarchy import *
 import numpy as np
+from src.concept_vectors import *
 
 def test_hierarchy_class():
     h = Hierarchy()
@@ -47,6 +48,23 @@ def test_hierarchy_methods():
     assert len(h) == len(random_vectors)-1
     assert h.shape[1] == 4
 
+def test_hierarchy_simplified():
+    h1 = create_hierarchy(create_ward_hierarchy,load_cem_vectors_simple, 'xor',['0','1'],42)
+    h2 = create_hierarchy(create_linkage_hierarchy,load_tcav_vectors_simple, 'unfiled',['soccer','alga'],42)
+    h3 = create_hierarchy(create_linkage_hierarchy,load_label_vectors_simple, 'cub',["has_bill_shape::dagger",'has_bill_shape::hooked_seabird'],42)
+        
+    assert type(h1) == type(h2)
+    assert type(h2) == type(h3)
+    assert type(h1) == type(h3)
+    assert h1 != None
+    assert h2 != None
+    assert h3 != None
+    
+    assert len(str(h1)) > 25
+    assert len(str(h2)) > 25
+    assert len(str(h3)) > 50
+    
 if __name__ == "__main__":
-    test_hierarchy_methods()
-    test_hierarchy_class()
+    test_hierarchy_simplified()
+    #test_hierarchy_methods()
+    #test_hierarchy_class()

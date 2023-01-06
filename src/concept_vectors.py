@@ -51,6 +51,7 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
             Numpy array of size (k,n), where k = number of concepts vectors, and n = size of the bottleneck
             List of size k, with metadata on each concept (the random comparison, alpha used, bottleneck)
     """
+    
     if seed == -1:
         seed = get_seed_numbers("./results/cavs/{}".format(experiment_name))
         if len(seed) == 0:
@@ -64,8 +65,8 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     for bottleneck in bottlenecks:
         for alpha in alphas:
             file_name_pattern = "{}-random*-{}-linear-{}.pkl".format(concept,bottleneck,alpha)
-            all_matching_files += glob.glob(dataset_location+"/"+file_name_pattern)
-                        
+            all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
+                                        
             for file_name in all_matching_files:
                 re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(concept,bottleneck,alpha),file_name)
                 random_concept = re_search.group(1)
@@ -298,11 +299,8 @@ def load_tcav_vectors_simple(attribute,dataset,seed=-1):
     Returns: 
         Numpy array of TCAV vectors
     """
-    
-    if dataset == 'cub':
-        return load_tcav_vectors(attribute,['mixed4c'],experiment_name='cub',seed=seed)[0]
-    elif dataset == 'mnist':
-        return load_tcav_vectors(attribute,['mixed4c'],experiment_name='mnist',seed=seed)[0]
+        
+    return load_tcav_vectors(attribute,['mixed4c'],experiment_name=dataset,seed=seed)[0]
 
 def load_label_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
