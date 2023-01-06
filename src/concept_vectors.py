@@ -51,7 +51,7 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
             Numpy array of size (k,n), where k = number of concepts vectors, and n = size of the bottleneck
             List of size k, with metadata on each concept (the random comparison, alpha used, bottleneck)
     """
-    
+        
     if seed == -1:
         seed = get_seed_numbers("./results/cavs/{}".format(experiment_name))
         if len(seed) == 0:
