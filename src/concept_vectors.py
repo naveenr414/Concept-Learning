@@ -361,6 +361,8 @@ if __name__ == "__main__":
                         help='Number of random ImageNet classes we compare the concept vector with')
     parser.add_argument('--images_per_folder',type=int, default=50,
                         help='Number of images in each random random folder')
+    parser.add_argument('--seed',type=int, default=42,
+                        help='Random seed used in tcav experiment')
 
     args = parser.parse_args()
     
@@ -368,9 +370,9 @@ if __name__ == "__main__":
         raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
         
     if args.algorithm == 'tcav':
-        create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha])
+        create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha],seed=args.seed)
     elif args.algorithm == 'tcav_cub':
-        create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder)
+        create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
     elif args.algorithm == 'tcav_mnist':
-        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder)
+        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
    
