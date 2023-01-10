@@ -5,6 +5,101 @@ import shutil
 from pathlib import Path
 import random
 import glob
+from PIL import Image
+
+def add_gaussian_noise(img_array,mean,standard_deviation):
+    """Given a numpy array representing an image, add gaussian noise to the array
+    
+    Arguments:
+        img_array: Numpy array with values between 0-255
+        mean: Mean for the Gaussian noise
+        standard_deviation: Standard Deviation (Sigma) for the standard deviation
+
+    Returns:
+        numpy array with random noise
+    """
+    
+    noise = np.random.normal(mean,standard_deviation,img_array.shape)
+    result = img_array + noise
+    result = np.clip(result,0,255).astype(int)
+    
+    return result
+
+def create_junk_image(img_array):
+    """Given a numpy array representing an image, return an image of the same size with random values
+    
+    Arguments:
+        img_array: Numpy array with values between 0-255
+        
+    Returns: 
+        numpy array with junk values
+        
+    """
+    
+    output_arr = np.random.uniform(0,255,img_array.shape)
+    return output_arr.astype(int)
+
+def write_new_image_function(input_path,output_path,func):
+    """Create a new image by applying some function to an input image
+    
+    Arguments:
+        input_path: Location of image
+        output_path: Location to where the output image should be written
+        func: Function that takes in a numpy array and outputs another numpy array
+        
+    Returns: Nothing
+    
+    Side Effects: Re-writes image at output_path
+    """
+    
+    im1 = Image.open(input_path)
+    new_arr = func(np.array(im1)).astype(np.uint8)
+        
+    output_image = Image.fromarray(new_arr)
+    output_image.save(output_path)
+    
+def run_function_MNIST(output_folder_name,func):
+    """Run some function over all MNIST files, based on what the output folder should be called
+    
+    Arguments: 
+        output_folder_name: Striong representing which folder everything should be written to, like colored_mnist_robustness
+        func: Some function that takes in an image_array and outputs an image_array
+    
+    Returns: Nothing
+    
+    Side Effects: Runs some function over all images in MNIST, and saves it in output_folder
+    """
+    
+    all_input_files = glob.glob("dataset/colored_mnist/images/*/*.png")
+    
+    for input_file in all_input_files:
+        corresponding_output = input_file.replace("colored_mnist",output_folder_name)
+        write_new_image_function(input_file,corresponding_output,func)
+        
+def create_gaussian_MNIST():
+    """Create the robustness MNIST dataset by running Gaussian Noise over all MNIST images
+    
+    Arguments: Nothing
+    
+    Returns: Nothing
+    
+    Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
+    """
+    
+    run_function_MNIST("colored_mnist_robustness",lambda arr: add_gaussian_noise(arr,0,50))
+    
+def create_junk_MNIST():
+    """Create the responsiveness MNIST dataset by creating Junk Images over all MNIST images
+    
+    Arguments: Nothing
+    
+    Returns: Nothing
+    
+    Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
+    """
+    
+    run_function_MNIST("colored_mnist_responsiveness", create_junk_image)
+    
 
 def get_seed_numbers(folder_location):
     """Get all sub-directory names in a folder; used typically to find which seeds were used for an experiment
