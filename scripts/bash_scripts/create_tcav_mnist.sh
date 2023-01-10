@@ -2,19 +2,10 @@
 
 for seed in 43 44 45
 do
-
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 0_color --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 1_color --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 2_color --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 3_color --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 4_color --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 0_number --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 1_number --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 2_number --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 3_number --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name 4_number --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-
-    python src/concept_vectors.py --algorithm tcav_mnist --class_name spurious --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
-
+    for algorithm in tcav_mnist_robustness tcav_mnist_responsiveness do
+        for attribute in 0_color 1_color 2_color 3_color 4_color 0_number 1_number 2_number 3_number 4_number spurious
+        do 
+            python src/concept_vectors.py --algorithm $algorithm --class_name $attribute --target zebra --num_random_exp 10 --images_per_folder 500 --seed $seed
+        done
+    done
 done

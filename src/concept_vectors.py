@@ -149,13 +149,15 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed)
 
-def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
+def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1,suffix=''):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
     
     Arguments:
-        attribute_name: String containing one of the 112 CUB attributes
+        attribute_name: String containing one of the MNIST attriubtes
+        num_random_exp: How many random images to compare to for each attribute
+        suffix: String for if we're running a special type of the MNIST dataset, such as mnist_robustness
 
     Returns:
         None
@@ -173,7 +175,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist",alphas=[0.1],seed=seed)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed)
 
 def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
     """From a list of concepts or attributes, generate their representation in some model
@@ -373,6 +375,6 @@ if __name__ == "__main__":
         create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha],seed=args.seed)
     elif args.algorithm == 'tcav_cub':
         create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
-    elif args.algorithm == 'tcav_mnist':
-        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
-   
+    elif 'tcav_mnist' in args.algorithm == 'tcav_mnist':
+        suffix = args.algorithm.replace("tcav_mnist","")
+        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed,suffix=suffix)
