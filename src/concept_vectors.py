@@ -107,19 +107,20 @@ def create_vector_from_label_cub(attribute_name,seed=-1):
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_vector_from_label_mnist(attribute_name,seed=-1):
+def create_vector_from_label_mnist(attribute_name,seed=-1,suffix=''):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
         the presence of the attribute in data point 1, and not present in datapoints 0, 2
         
     Arguments:
-        attribute_name: String representing one of the 112 CUB attributes
+        attribute_name: String representing one of the MNIST attributes
+        suffix: String representing if we run a variant of the MNIST dataset, such as mnist_robustness
 
     Returns:
         concept_vector: Numpy vector representing the concept vector for the attribute
     """
     
-    mnist_data = load_mnist(seed)    
+    mnist_data = load_mnist(seed,suffix=suffix)    
     concept_vector = [i[attribute_name] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
@@ -318,7 +319,7 @@ def load_label_vectors_simple(attribute,dataset,seed=-1):
     if dataset == 'cub':
         vector = create_vector_from_label_cub(attribute,seed=seed)
     elif dataset == 'mnist':
-        vector = create_vector_from_label_mnist(attribute,seed=seed)
+        vector = create_vector_from_label_mnist(attribute,seed=seed,suffix=dataset.replace("mnist",""))
         
     return np.array(vector)
 
@@ -368,12 +369,13 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    if args.algorithm not in ['tcav','tcav_cub','tcav_mnist']:
+    if args.algorithm not in ['tcav','tcav_cub','tcav_mnist', 'tcav_mnist_image_robustness', 'tcav_mnist_image_responsiveness']:
         raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
         
     if args.algorithm == 'tcav':
         create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha],seed=args.seed)
     elif args.algorithm == 'tcav_cub':
+        suffix = args.algorithm.replace("tcav_cub","")
         create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
     elif 'tcav_mnist' in args.algorithm == 'tcav_mnist':
         suffix = args.algorithm.replace("tcav_mnist","")

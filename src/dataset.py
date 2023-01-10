@@ -243,14 +243,15 @@ def load_cub_split(split_name,seed=-1):
     
     return data
 
-def load_mnist(seed=-1):
+def load_mnist(seed=-1,suffix=''):
     """Load the MNIST dictionary, along with concept values from train.pkl
     
     Arguments: Seed: Optional number that changes the order of data
+        Suffix: Optional, potential variant of the MNIST dataset
     
     Returns: List of dictionaries, containing info on each colored MNIST data point"""
     
-    file_name = "dataset/colored_mnist/images/{}.pkl".format("train")
+    file_name = "dataset/colored_mnist{}/images/{}.pkl".format("train",suffix)
     data = pickle.load(open(file_name,"rb"))
     
     if seed > -1:
