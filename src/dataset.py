@@ -6,6 +6,7 @@ from pathlib import Path
 import random
 import glob
 from PIL import Image
+from copy import deepcopy
 
 def add_gaussian_noise(img_array,mean,standard_deviation):
     """Given a numpy array representing an image, add gaussian noise to the array
@@ -86,6 +87,13 @@ def create_gaussian_MNIST():
     Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
     """
     
+    flip_probability = .01    
+    for file_name in ["train","val"]:
+        flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
+                                 "dataset/colored_mnist_robustness/images/{}.pkl".format(file_name),
+                                 flip_probability,
+                                 lambda s: s.replace("colored_mnist","colored_mnist_robustness"))
+    
     run_function_MNIST("colored_mnist_robustness",lambda arr: add_gaussian_noise(arr,0,50))
     
 def create_junk_MNIST():
@@ -98,8 +106,59 @@ def create_junk_MNIST():
     Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
     """
     
-    run_function_MNIST("colored_mnist_responsiveness", create_junk_image)
+    flip_probability = 0.5
     
+    for file_name in ["train","val"]:
+        flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
+                                 "dataset/colored_mnist_responsiveness/images/{}.pkl".format(file_name),
+                                 flip_probability,
+                                 lambda s: s.replace("colored_mnist","colored_mnist_responsiveness"))
+
+    run_function_MNIST("colored_mnist_responsiveness", create_junk_image)
+
+        
+def flip_concept_labels(concept_list,flip_prob,img_path_update):
+    """Flip probabilities of concept labels according to some probability
+    
+    Arguments:
+        concept_list: List of dictionaries representing concept labels
+        flip_prob: The probability any individual concept is flipped
+        img_path_update: Function to update the images path when flipping concept labels
+        
+    Returns:
+        New concept_list with concepts flipped 
+    """
+    
+    new_arr = deepcopy(concept_list)
+    
+    for data in new_arr:
+        data['img_path'] = img_path_update(data['img_path'])
+        
+        for i in range(len(data['attribute_label'])):
+            if np.random.random() < flip_prob:
+                data['attribute_label'][i] = 1-data['attribute_label'][i]
+                
+    return new_arr
+
+def flip_concept_labels_file(input_file,output_file,flip_probability,img_path_update):
+    """Given an input file with concept labels, such as train.pkl, and an output file, flip attribute_labels with 
+        probability flip_probability
+        
+    Arguments:
+        input_file: train.pkl or valid.pkl which stores a list of dictionaries
+        output_file: Place to put the new pkl file
+        flip_probability: Probability of independently flipping any attribute from 0<->1
+        img_path_update: Function to update image paths
+        
+    Returns: Nothing
+    
+    Side Effects: Writes a new flipped pkl file to output_file
+    """
+    
+    all_concepts = pickle.load(open(input_file,"rb"))
+    new_all_concepts = flip_concept_labels(all_concepts,flip_probability,img_path_update)
+    pickle.dump(new_all_concepts,open(output_file,"wb"))
+        
 
 def get_seed_numbers(folder_location):
     """Get all sub-directory names in a folder; used typically to find which seeds were used for an experiment
@@ -252,7 +311,10 @@ def get_mnist_images_by_attribute(attribute_name):
     """
     
     mnist_data = load_mnist()
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 1]
+    mnist_attributes = get_mnist_attributes()
+    attribute_index = mnist_attributes.index(attribute_name)
+    
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['attribute_label'][attribute_index] == 1]
     return matching_attributes
 
 def get_cub_images_without_attribute(attribute_name,folder_num=0):
@@ -290,7 +352,11 @@ def get_mnist_images_without_attribute(attribute_name,folder_num=0):
     """
     
     mnist_data = load_mnist()
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i[attribute_name] == 0]
+    mnist_attributes = get_mnist_attributes()
+    
+    attribute_index = mnist_attributes.index(attribute_name)
+    
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['attribute_label'][attribute_index] == 0]
     return matching_attributes
 
 def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
@@ -309,7 +375,10 @@ def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
     # Find some random class without the attribute
     random_class = folder_num % 10 
     
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class and i[attribute_name] == 0]
+    mnist_attributes = get_mnist_attributes()
+    attribute_index = mnist_attributes.index(attribute_name)
+    
+    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class and i['attribute_label'][attribute_index] == 0]
     if len(matching_attributes) == 0:
         matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class] 
     
