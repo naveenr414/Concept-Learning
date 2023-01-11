@@ -167,8 +167,8 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute_one_class,images_per_folder,seed=seed)
+    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix)
+    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute,suffix=suffix,images_per_folder=images_per_folder,seed=seed)
     
     concepts = [attribute_name]
     target = "zebra"
@@ -377,6 +377,6 @@ if __name__ == "__main__":
     elif args.algorithm == 'tcav_cub':
         suffix = args.algorithm.replace("tcav_cub","")
         create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
-    elif 'tcav_mnist' in args.algorithm == 'tcav_mnist':
+    elif 'tcav_mnist' in args.algorithm:
         suffix = args.algorithm.replace("tcav_mnist","")
         create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed,suffix=suffix)

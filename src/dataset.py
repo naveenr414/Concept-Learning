@@ -90,11 +90,11 @@ def create_gaussian_MNIST():
     flip_probability = .01    
     for file_name in ["train","val"]:
         flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
-                                 "dataset/colored_mnist_robustness/images/{}.pkl".format(file_name),
+                                 "dataset/colored_mnist_image_robustness/images/{}.pkl".format(file_name),
                                  flip_probability,
-                                 lambda s: s.replace("colored_mnist","colored_mnist_robustness"))
+                                 lambda s: s.replace("colored_mnist","colored_mnist_image_robustness"))
     
-    run_function_MNIST("colored_mnist_robustness",lambda arr: add_gaussian_noise(arr,0,50))
+    run_function_MNIST("colored_mnist_image_robustness",lambda arr: add_gaussian_noise(arr,0,50))
     
 def create_junk_MNIST():
     """Create the responsiveness MNIST dataset by creating Junk Images over all MNIST images
@@ -110,11 +110,11 @@ def create_junk_MNIST():
     
     for file_name in ["train","val"]:
         flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
-                                 "dataset/colored_mnist_responsiveness/images/{}.pkl".format(file_name),
+                                 "dataset/colored_mnist_image_responsiveness/images/{}.pkl".format(file_name),
                                  flip_probability,
-                                 lambda s: s.replace("colored_mnist","colored_mnist_responsiveness"))
+                                 lambda s: s.replace("colored_mnist","colored_mnist_image_responsiveness"))
 
-    run_function_MNIST("colored_mnist_responsiveness", create_junk_image)
+    run_function_MNIST("colored_mnist_image_responsiveness", create_junk_image)
 
         
 def flip_concept_labels(concept_list,flip_prob,img_path_update):
@@ -251,7 +251,7 @@ def load_mnist(seed=-1,suffix=''):
     
     Returns: List of dictionaries, containing info on each colored MNIST data point"""
     
-    file_name = "dataset/colored_mnist{}/images/{}.pkl".format("train",suffix)
+    file_name = "dataset/colored_mnist{}/images/{}.pkl".format(suffix,"train")
     data = pickle.load(open(file_name,"rb"))
     
     if seed > -1:
@@ -301,7 +301,7 @@ def get_cub_classes_by_attribute(attribute_name):
     return sorted(list(set(bird_types)))
     
 
-def get_mnist_images_by_attribute(attribute_name):
+def get_mnist_images_by_attribute(attribute_name,suffix):
     """Return a list of MNIST image files with some attribute
     
     Arguments: 
@@ -311,7 +311,7 @@ def get_mnist_images_by_attribute(attribute_name):
         String list, with the locations of each image containing attribute
     """
     
-    mnist_data = load_mnist()
+    mnist_data = load_mnist(suffix=suffix)
     mnist_attributes = get_mnist_attributes()
     attribute_index = mnist_attributes.index(attribute_name)
     
@@ -342,7 +342,7 @@ def get_cub_images_without_attribute(attribute_name,folder_num=0):
     locations_without_attribute = [i for i in all_image_locations if i not in locations_with_attribute]
     return locations_without_attribute
 
-def get_mnist_images_without_attribute(attribute_name,folder_num=0):
+def get_mnist_images_without_attribute(attribute_name,suffix='',folder_num=0):
     """Return a list of MNIST image files without some attribute
     
     Arguments: 
@@ -352,7 +352,7 @@ def get_mnist_images_without_attribute(attribute_name,folder_num=0):
         String list, with the locations of each image lacking the attribute
     """
     
-    mnist_data = load_mnist()
+    mnist_data = load_mnist(suffix=suffix)
     mnist_attributes = get_mnist_attributes()
     
     attribute_index = mnist_attributes.index(attribute_name)
@@ -360,7 +360,7 @@ def get_mnist_images_without_attribute(attribute_name,folder_num=0):
     matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['attribute_label'][attribute_index] == 0]
     return matching_attributes
 
-def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
+def get_mnist_images_without_attribute_one_class(attribute_name,suffix='',folder_num=0):
     """Return a list of MNIST image files without some attribute, 
         where all images are from one class
     
@@ -371,7 +371,7 @@ def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
         String list, with the locations of each image lacking the attribute
     """
     
-    mnist_data = load_mnist()
+    mnist_data = load_mnist(suffix=suffix)
     
     # Find some random class without the attribute
     random_class = folder_num % 10 
@@ -386,7 +386,7 @@ def get_mnist_images_without_attribute_one_class(attribute_name,folder_num):
     return matching_attributes
 
 
-def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction, images_per_folder=50,seed=-1):
+def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction,suffix='',images_per_folder=50,seed=-1):
     """Create new folders, with each folder containing birds without a particular attribute
     
     Arguments:
@@ -410,18 +410,18 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
         random.seed(seed)
     
     for folder_num in range(num_folders):
-        image_locations = attribute_antifunction(attribute_name,folder_num)
+        image_locations = attribute_antifunction(attribute_name,folder_num=folder_num,suffix=suffix)
         folder_location = "dataset/images/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
             os.mkdir(folder_location)
         delete_files_in_directory(folder_location)
-        
+                
         random_images = random.sample(image_locations,images_per_folder)
         
         for image in random_images:
             shutil.copy2(image,folder_location)
     
-def create_folder_from_attribute(attribute_name,attribute_function,seed=-1):
+def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffix=''):
     """Create a new folder, with the images being all birds with a particular attribute
     
     Arguments:
@@ -440,7 +440,7 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1):
     if seed > -1:
         random.seed(seed)
     
-    image_locations = attribute_function(attribute_name)
+    image_locations = attribute_function(attribute_name,suffix=suffix)
     folder_location = "dataset/images/{}".format(attribute_name)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)
