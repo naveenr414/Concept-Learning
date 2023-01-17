@@ -124,13 +124,17 @@ def create_vector_from_label_mnist(attribute_name,seed=-1,suffix=''):
     concept_vector = [i[attribute_name] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
+def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per_folder=50,seed=-1):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
     
     Arguments:
         attribute_name: String containing one of the 112 CUB attributes
+        num_random_exp: How many random experiments to run
+        positive_images: In the positive examples (attributes), how many images should there be 
+        images_per_folder: In the random folders, how many images there should be 
+        seed: Random seed
 
     Returns:
         None
@@ -139,7 +143,7 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed)
+    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed,num_images=positive_images)
     create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder,seed=seed)
     
     concepts = [attribute_name]
@@ -148,10 +152,10 @@ def create_tcav_cub(attribute_name,num_random_exp,images_per_folder=50,seed=-1):
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed,positive_images=positive_images)
 
-def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1,suffix=''):
-    """Helper function to create TCAV from CUB Attribute
+def create_tcav_mnist(attribute_name,num_random_exp,positive_images=100,images_per_folder=50,seed=-1,suffix=''):
+    """Helper function to create TCAV from MNIST Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
     
@@ -167,7 +171,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix)
+    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix,num_images=positive_images)
     create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute,suffix=suffix,images_per_folder=images_per_folder,seed=seed)
     
     concepts = [attribute_name]
@@ -176,7 +180,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,images_per_folder=50,seed=-1
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed,positive_images=positive_images)
 
 def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
     """From a list of concepts or attributes, generate their representation in some model
@@ -222,7 +226,7 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
     
     return acts
     
-def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1):
+def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1,positive_images=100):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     
     Arguments:
@@ -232,6 +236,7 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
         bottlenecks: Which layers in the GoogleNet model to use; such as ["mixed4c"]
         num_random_exp: Number of comparisons between each concept and the random classes; 
             The number of concept vectors made is roughly the num_random_exp
+        positive_images: How many images are in each positive image class
             
     Returns:
         None
@@ -264,7 +269,13 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     else:
         raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
 
-    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir, max_examples=100)
+    # Remove existing activations
+    for concept in concepts:
+        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottlenecks[0])
+        if os.path.exists(activation_file_location):
+            os.remove(activation_file_location)
+        
+    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir, max_examples=positive_images)
     
     # Remove existing TCAV vectors, so it generates new ones
     for concept in concepts:

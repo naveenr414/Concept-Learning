@@ -421,13 +421,14 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
         for image in random_images:
             shutil.copy2(image,folder_location)
     
-def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffix=''):
+def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffix='',num_images=100):
     """Create a new folder, with the images being all birds with a particular attribute
     
     Arguments:
         attribute_name: String that's an attribute to either the MNIST dataset or the Birds Dataset
         attribute_function: Function that retrieves all matching images, given an attribute
             Either get_mnist_images_by_attribute or get_cub_images_by_attribute
+        num_images: How many images to select from the attribute folder, at most
 
     Returns:
         None
@@ -444,6 +445,14 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     folder_location = "dataset/images/{}".format(attribute_name)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)
+        
+    # Clear that folder 
+    files = glob.glob("{}/*".format(folder_location))
+    for f in files:
+        os.remove(f)
+
+    if len(image_locations)>num_images:
+        image_locations = random.sample(image_locations,k=num_images)
     
     # Copy each image in image_locations to the folder
     for image in image_locations:

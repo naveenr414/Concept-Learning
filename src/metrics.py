@@ -43,9 +43,21 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
     Returns: 
         Float, representing average paired distance between hierarchies
     """
-
+    
+    if suffix not in ["","_image_robustness","_image_responsiveness"]:
+        raise Exception("{} suffix not supported".format(suffix))
+    
     baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,attributes,seed) for seed in random_seeds]
     robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset+suffix,attributes,seed) for seed in random_seeds]
+    
+    responsiveness_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset+"_image_responsiveness",attributes,seed) for seed in random_seeds]
+
+    print(baseline_hierarchies[0].distance(responsiveness_hierarchies[0]))
+    print(baseline_hierarchies[0].distance(robust_hierarchies[0]))
+
+    print(robust_hierarchies[0].distance(baseline_hierarchies[0]))
+    print(responsiveness_hierarchies[0].distance(baseline_hierarchies[0]))
+
     
     distance_list = []
     for h1,h2 in zip(baseline_hierarchies,robust_hierarchies):
@@ -68,7 +80,7 @@ def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes
         Float, representing the average distance between each pair of images when perturbed, comparing only like-seeds
     """
     
-    compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,"_image_robustness")
+    return compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,"_image_robustness")
     
 def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
     """Compute the image responsiveness metric for a set of random seeds, given a hierarchy+embedding method
@@ -85,6 +97,6 @@ def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attrib
          Float, representing the average distance between each pair of images when significantly altered, comparing only like-seeds
     """
 
-    compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,"_image_responsiveness")
+    return compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,"_image_responsiveness")
 
         

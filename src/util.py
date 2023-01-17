@@ -4,6 +4,7 @@ from scipy.spatial.distance import cosine
 from collections import Counter
 from collections import defaultdict
 import random
+import tensorflow as tf
 
 def create_distance_metric(vector_a,vector_b,metric):
     """Find the distance for every pair of vectors in vector_a and vector_b
@@ -218,3 +219,18 @@ def get_center(data):
     """
     
     return np.mean(data,axis=0)
+
+def load_pb(path_to_pb):
+    """Load a Tensorflow Model stored in a .pb file 
+    
+    Arguments:
+        path_to_pb: Location of the pb file, as a string
+        
+    Returns:
+        Tensorflow graph with information on the weights of the model
+    """
+    
+    with tf.io.gfile.GFile(path_to_pb, "rb") as f:
+        graph_def = tf.compat.v1.GraphDef()
+        graph_def.ParseFromString(f.read())
+    return graph_def
