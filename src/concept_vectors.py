@@ -121,7 +121,13 @@ def create_vector_from_label_mnist(attribute_name,seed=-1,suffix=''):
     """
     
     mnist_data = load_mnist(seed,suffix=suffix)    
-    concept_vector = [i[attribute_name] for i in mnist_data]
+    mnist_attributes = get_mnist_attributes()
+    
+    attribute_to_index = {}
+    for i,attribute in enumerate(mnist_attributes):
+        attribute_to_index[attribute] = i
+    
+    concept_vector = [i['attribute_label'][attribute_to_index[attribute_name]] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
 def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per_folder=50,seed=-1):
@@ -329,8 +335,10 @@ def load_label_vectors_simple(attribute,dataset,seed=-1):
     
     if dataset == 'cub':
         vector = create_vector_from_label_cub(attribute,seed=seed)
-    elif dataset == 'mnist':
+    elif dataset in ['mnist','mnist_image_responsiveness','mnist_image_robustness']:
         vector = create_vector_from_label_mnist(attribute,seed=seed,suffix=dataset.replace("mnist",""))
+    else:
+        raise Exception("{} not implemented".format(dataset))
         
     return np.array(vector)
 

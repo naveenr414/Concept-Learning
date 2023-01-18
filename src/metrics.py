@@ -50,15 +50,6 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
     baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,attributes,seed) for seed in random_seeds]
     robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset+suffix,attributes,seed) for seed in random_seeds]
     
-    responsiveness_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset+"_image_responsiveness",attributes,seed) for seed in random_seeds]
-
-    print(baseline_hierarchies[0].distance(responsiveness_hierarchies[0]))
-    print(baseline_hierarchies[0].distance(robust_hierarchies[0]))
-
-    print(robust_hierarchies[0].distance(baseline_hierarchies[0]))
-    print(responsiveness_hierarchies[0].distance(baseline_hierarchies[0]))
-
-    
     distance_list = []
     for h1,h2 in zip(baseline_hierarchies,robust_hierarchies):
         distance_list.append(h1.distance(h2))
