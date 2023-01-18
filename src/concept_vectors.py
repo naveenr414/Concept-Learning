@@ -130,7 +130,7 @@ def create_vector_from_label_mnist(attribute_name,seed=-1,suffix=''):
     concept_vector = [i['attribute_label'][attribute_to_index[attribute_name]] for i in mnist_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per_folder=50,seed=-1):
+def create_tcav_cub(attribute_name,num_random_exp,max_examples=100,images_per_folder=50,seed=-1):
     """Helper function to create TCAV from CUB Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -138,7 +138,7 @@ def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per
     Arguments:
         attribute_name: String containing one of the 112 CUB attributes
         num_random_exp: How many random experiments to run
-        positive_images: In the positive examples (attributes), how many images should there be 
+        max_examples: In the positive examples (attributes), how many images should there be 
         images_per_folder: In the random folders, how many images there should be 
         seed: Random seed
 
@@ -149,7 +149,7 @@ def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed,num_images=positive_images)
+    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed,num_images=max_examples)
     create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder,seed=seed)
     
     concepts = [attribute_name]
@@ -158,9 +158,9 @@ def create_tcav_cub(attribute_name,num_random_exp,positive_images=100,images_per
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed,positive_images=positive_images)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed,max_examples=max_examples)
 
-def create_tcav_mnist(attribute_name,num_random_exp,positive_images=100,images_per_folder=50,seed=-1,suffix=''):
+def create_tcav_mnist(attribute_name,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix=''):
     """Helper function to create TCAV from MNIST Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -177,7 +177,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,positive_images=100,images_p
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix,num_images=positive_images)
+    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix,num_images=max_examples)
     create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute,suffix=suffix,images_per_folder=images_per_folder,seed=seed)
     
     concepts = [attribute_name]
@@ -186,14 +186,69 @@ def create_tcav_mnist(attribute_name,num_random_exp,positive_images=100,images_p
     bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed,positive_images=positive_images)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed,max_examples=max_examples)
 
-def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1,max_examples=500):
+def delete_previous_activations(bottleneck,attribute_list):
+    """Delete all the previous activations so we can generate them 
+    
+    Arguments:
+        bottleneck: String, such as mixed4c
+        attribute_list: List of concepts which we want to delete and reset
+        
+    Returns: Nothing
+
+    Side Effects: Deletes all files in activation_dirs corresponding to attributes in attribute_list
+    """
+    
+    activation_dir = './results/activations'
+    
+    for concept in attribute_list:
+        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottleneck)
+        if os.path.exists(activation_file_location):
+            os.remove(activation_file_location)
+
+    
+def load_activations_model(experiment_name,max_examples,model_name):
+    """Given a model and an experiment name, create an activation class that loads activations
+    
+    Arguments:
+        experiment_name: String representing which experiment we're running; this is a folder in 
+            ./dataset/images
+        max_examples: Maximum number of activations to load
+        model_name: String representing the model name; currently we only support GoogleNet
+        
+    Returns:
+        Object from ImageActivationGenerator
+    """
+    
+    image_dir = "./dataset/images"
+    activation_dir = './results/activations'
+    models_used = ["GoogleNet"]
+    
+    if model_name not in models_used:
+        raise Exception("Model {} not implemented yet, select one of {}".format(model_name,models_used))
+        
+    with sess as utils.create_session():
+        if model_name == "GoogleNet":
+            GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
+            LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+            mymodel = model.GoogleNetWrapper_public(sess,
+                                            GRAPH_PATH,
+                                            LABEL_PATH)
+            
+    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
+    return act_generator
+    
+def get_activations_dictionary(attribute_list,model_name="GoogleNet",
+                               experiment_name="unfiled",max_examples=500,bottleneck="mixed4c"):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
         
     Arguments:
         attribute_list: String list of concepts to be analyzed, such as 'zebra'
+        model_name: Which model to load these activations from
+        experiment_name: String pointing to the folder where our images are
+        max_examples: Maximum number of activations to load 
 
     Returns:
         Dictionary: Each key is an attribute, and each value is a numpy array of size 
@@ -201,30 +256,9 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1,max_e
             bottleneck
     """
     
-    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
-    activation_dir = './results/activations'
-    working_dir = './results/tmp'
-    image_dir = "./dataset/images"
-    model_name = "GoogleNet"
-    
-    sess = utils.create_session()
-    if model_name == "GoogleNet":
-        GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
-        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
-        mymodel = model.GoogleNetWrapper_public(sess,
-                                            GRAPH_PATH,
-                                            LABEL_PATH)
-    else:
-        raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
-
-    bottlenecks = ["mixed4c"]
-    for concept in attribute_list:
-        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottlenecks[0])
-        if os.path.exists(activation_file_location):
-            os.remove(activation_file_location)
+    delete_previous_activations(bottleneck,attribute_list)
+    act_generator = load_activations_model(experiment_name,max_examples,model_name)
             
-    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
-        
     acts = {}
     for i in attribute_list:
         examples = act_generator.get_examples_for_concept(i)
@@ -232,12 +266,35 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1,max_e
         acts[i] = activation_examples
         shape = acts[i].shape
         acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
-    
-    sess.close()
-    
+        
     return acts
+
+def reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,botteneck,alpha):
+    """Delete all TCAV files in the CAV directory so we can re-train them 
     
-def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1,positive_images=100):
+    Arguments:
+        concepts: List of attributes which we wish to delete
+        num_random_exp: Number representing how many random experiments we want to delete from
+        experiment_name: String for the name of the experiemnt we're deeleting from
+        seed: Random seed, also a folder in the cav directory
+        bottleneck: String for a layer in the model, such as mixed4c
+        alpha: Hyperparameter, float 
+        
+    Returns: Nothing
+    
+    Side Effects: Deletes all CAVs in a folder
+    """
+    
+    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
+    
+    for concept in concepts:
+        for i in range(num_random_exp):
+            tcav_file_location = "{}/{}-random500_{}-{}-linear-{}.pkl".format(cav_dir,concept,i,bottleneck,alpha)
+            if os.path.exists(tcav_file_location):
+                os.remove(tcav_file_location)
+    
+    
+def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1,max_examples=100):
     """Creates a set of TCAV vectors based on concepts, with the intent of predicting target
     
     Arguments:
@@ -247,7 +304,7 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
         bottlenecks: Which layers in the GoogleNet model to use; such as ["mixed4c"]
         num_random_exp: Number of comparisons between each concept and the random classes; 
             The number of concept vectors made is roughly the num_random_exp
-        positive_images: How many images are in each positive image class
+        max_examples: How many images are in each positive image class
             
     Returns:
         None
@@ -262,39 +319,16 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     np.random.seed(seed)
     random.seed(seed)
     
-    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
-    activation_dir = './results/activations'
-    working_dir = './results/tmp'
-    image_dir = "./dataset/images"
+    act_generator = load_activations_model(experiment_name,max_examples,model_name)
+    delete_previous_activations(bottlenecks[0],concepts)
     
+    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
     if not os.path.exists(cav_dir):
         os.makedirs(cav_dir)
-    
-    sess = utils.create_session()
-    if model_name == "GoogleNet":
-        GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
-        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
-        mymodel = model.GoogleNetWrapper_public(sess,
-                                            GRAPH_PATH,
-                                            LABEL_PATH)
     else:
-        raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
+        reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottenecks[0],alphas[0])
 
-    # Remove existing activations
-    for concept in concepts:
-        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottlenecks[0])
-        if os.path.exists(activation_file_location):
-            os.remove(activation_file_location)
-        
-    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir, max_examples=positive_images)
-    
-    # Remove existing TCAV vectors, so it generates new ones
-    for concept in concepts:
-        for i in range(num_random_exp):
-            tcav_file_location = "{}/{}-random500_{}-{}-linear-{}.pkl".format(cav_dir,concept,i,bottlenecks[0],alphas[0])
-            if os.path.exists(tcav_file_location):
-                os.remove(tcav_file_location)
-    
+
     mytcav = tcav.TCAV(sess,
                    target,
                    concepts,
@@ -309,9 +343,6 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     mytcav._process_what_to_run_expand(num_random_exp=num_random_exp+1)
     mytcav.params = mytcav.get_params()
     
-    print("Pairs to test {}".format(mytcav.pairs_to_test))
-    print("Params {}".format(mytcav.params))
-
     mytcav.run(run_parallel=False)
     sess.close()
 
