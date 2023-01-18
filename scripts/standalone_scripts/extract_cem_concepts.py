@@ -97,6 +97,9 @@ def generate_data_loaders_cub():
         resampling=False,
         root_dir=cub_location+'/CUB_200_2011',
         num_workers=num_workers,
+        path_transform=lambda path:path.replace(
+            '/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/CUB_200_2011/',
+            '')
     )
     
     valid_dl = load_data(
@@ -110,6 +113,9 @@ def generate_data_loaders_cub():
         resampling=False,
         root_dir=cub_location+'/CUB_200_2011',
         num_workers=num_workers,
+        path_transform=lambda path:path.replace(
+            '/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/CUB_200_2011/',
+            '')
     )
     
     return train_dl, valid_dl
@@ -138,6 +144,9 @@ def generate_data_loaders_mnist():
         resampling=False,
         root_dir=mnist_location,
         num_workers=num_workers,
+        path_transform=lambda path:path.replace(
+            'colored_mnist/',
+            '')
     )
     
     valid_dl = load_data(
@@ -151,6 +160,9 @@ def generate_data_loaders_mnist():
         resampling=False,
         root_dir=mnist_location,
         num_workers=num_workers,
+        path_transform=lambda path:path.replace(
+            'colored_mnist/',
+            '')
     )
     
     return train_dl, valid_dl
@@ -172,7 +184,7 @@ if __name__ == "__main__":
     num_epochs = args.num_epochs
     validation_epochs = args.validation_epochs
     seed = args.seed
-    num_workers = 16
+    num_workers = 1
 
     pl.seed_everything(args.seed, workers=True)
     selected_concepts = retrieve_selected_concepts()
