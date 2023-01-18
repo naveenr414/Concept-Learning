@@ -39,7 +39,18 @@ def test_image_responsiveness():
     assert responsiveness_image_metric(create_linkage_hierarchy,
                                        load_label_vectors_simple,'mnist',mnist_attributes,[43,44,45]) > 20
     
+def test_truthfulness():
+    mnist_attributes = get_mnist_attributes()
+    assert 0<truthfulness_image_metric(create_linkage_hierarchy,
+                                       load_tcav_vectors_simple,'mnist',mnist_attributes,[43,44,45])<1
+    assert 0<truthfulness_image_metric(create_linkage_hierarchy,
+                                   load_tcav_vectors_simple,'mnist',mnist_attributes,[43])<1
+    assert 0<truthfulness_image_metric(create_linkage_hierarchy,
+                                   load_label_vectors_simple,'mnist',mnist_attributes,[43])<1
+    
+    
 if __name__ == "__main__":
     test_stability()
     test_image_robustness()
     test_image_responsiveness()
+    test_truthfulness()

@@ -188,7 +188,7 @@ def create_tcav_mnist(attribute_name,num_random_exp,positive_images=100,images_p
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed,positive_images=positive_images)
 
-def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
+def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1,max_examples=500):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
         
@@ -217,10 +217,14 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
     else:
         raise Exception("create_tcav_vectors not implemented for {}".format(model_name))
 
-    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=500)
-    
     bottlenecks = ["mixed4c"]
-    
+    for concept in attribute_list:
+        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottlenecks[0])
+        if os.path.exists(activation_file_location):
+            os.remove(activation_file_location)
+            
+    act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
+        
     acts = {}
     for i in attribute_list:
         examples = act_generator.get_examples_for_concept(i)
@@ -228,7 +232,6 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1):
         acts[i] = activation_examples
         shape = acts[i].shape
         acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
-        print("Activation {} is shape {}".format(i,acts[i].shape))
     
     return acts
     
