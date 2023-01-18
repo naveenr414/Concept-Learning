@@ -233,6 +233,8 @@ def load_activations_tcav(attribute_list,experiment_name="unfiled",seed=-1,max_e
         shape = acts[i].shape
         acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
     
+    sess.close()
+    
     return acts
     
 def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="unfiled",alphas=[0.1],seed=-1,positive_images=100):
@@ -311,6 +313,7 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     print("Params {}".format(mytcav.params))
 
     mytcav.run(run_parallel=False)
+    sess.close()
 
 def load_tcav_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings

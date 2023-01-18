@@ -216,7 +216,7 @@ def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,ran
     avg_truthfulness = []
     
     for seed in random_seeds:
-        reset_dataset(dataset,seed,100)
+        #reset_dataset(dataset,seed,100)
         for concept in selected_concepts:
             co_occuring_concepts = find_similar_concepts(concept,dataset,model,compare_concepts,seed)
             co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
