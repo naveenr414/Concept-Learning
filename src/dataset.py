@@ -7,6 +7,140 @@ import random
 import glob
 from PIL import Image
 from copy import deepcopy
+class Dataset:
+    def get_attributes(self):
+        pass
+    
+    def get_data(self,seed=-1,suffix=""):
+        file_name = self.pkl_path.format(suffix)
+        data = pickle.load(open(file_name,"rb"))
+
+        if seed > -1:
+            random.seed(seed)
+        random.shuffle(data)
+        return data
+    
+    def get_class_labels(self,seed=-1,suffix=""):
+        data = self.get_data(seed,suffix)
+        return set([i['class_label'] for i in data])
+    
+    def get_images_with_attribute(self,attribute_name,seed=-1,suffix=""):
+        data = self.get_data(seed,suffix)
+        attributes = self.get_attributes()
+        attribute_index = attributes.index(attribute_name)
+
+        matching_attributes = [self.path_to_image(i['img_path']) 
+                               for i in data if i['attribute_label'][attribute_index] == 1]
+        return matching_attributes
+    
+    def get_images_without_attribute(self,attribute_name,one_class=False,seed=-1,suffix=""):
+        data = self.get_data(seed,suffix)
+        attributes = self.get_attributes()
+        attribute_index = attributes.index(attribute_name)
+        
+        if one_class:
+            all_classes = self.get_class_labels(seed,suffix)
+            random_class = random.sample(list(all_classes),k=1)[0]
+
+            matching_attributes = [self.path_to_image(i['img_path']) 
+                                   for i in data if i['class_label'] == random_class and 
+                                   i['attribute_label'][attribute_index] == 0]
+            if len(matching_attributes) == 0:
+                matching_attributes = [self.path_to_image(i['img_path']) 
+                                       for i in data if i['class_label'] == random_class] 
+
+        else:
+            matching_attributes = [self.path_to_image(i['img_path']) 
+                                   for i in data if i['attribute_label'][attribute_index] == 0]
+        
+        return matching_attributes
+
+
+    
+    def create_gaussian(self):
+        flip_probability = .01
+        input_file = self.pkl_path.format('')
+        output_file = self.pkl_path.format('_image_robustness')
+        flip_concept_labels_file(input_file,
+                                 output_file,
+                                 flip_probability,
+                                 lambda s: s.replace(self.root_folder_name,
+                                                     self.root_folder_name+"_image_robustness"))
+
+        self.run_function(self.root_folder_name+"_image_robustness",lambda arr: add_gaussian_noise(arr,0,50))
+    
+    def create_junk(self):
+        flip_probability = 0.5
+        input_file = self.pkl_path.format('')
+        output_file = self.pkl_path.format('_image_responsiveness')
+
+        flip_concept_labels_file(input_file,
+                                 output_file,
+                                 flip_probability,
+                                 lambda s: s.replace(self.root_folder_name,
+                                                     self.root_folder_name+"_image_responsiveness"))
+        self.run_function(self.root_folder_name+"_image_robustness",lambda arr: create_junk_image)
+    
+    def run_function(self,output_folder_name,func):
+        all_input_files = glob.glob(self.all_files)
+
+        for input_file in all_input_files:
+            corresponding_output = input_file.replace(self.root_folder_name,output_folder_name)
+            write_new_image_function(input_file,corresponding_output,func)
+
+    
+class MNIST_Dataset(Dataset):
+    def __init__(self):
+        self.pkl_path = "dataset/colored_mnist{}/images/train.pkl"
+        self.path_to_image = lambda path: "dataset/"+path
+        self.all_files = "dataset/colored_mnist/images/*/*.png"
+        self.root_folder_name = "colored_mnist"
+        self.experiment_name = "mnist"
+        
+    def get_attributes(self):
+        """Get the information on which datapoints are used for split_name
+    
+        Arguments:
+            split_name: Either train, val, or test
+            seed: Optional random number that sets the order of data
+
+        Returns:
+            List of Dictionaries, which contain information on data for 
+                that split
+        """
+        
+        attributes = []
+    
+        for i in range(10):
+            attributes += ["{}_color".format(i),"{}_number".format(i)]
+
+        attributes += ["spurious"]
+        return attributes
+
+class CUB_Dataset(Dataset):
+    def __init__(self):
+        self.pkl_path = "dataset/CUB{}/preprocessed/train.pkl"
+        self.path_to_image = lambda path: "dataset/CUB/images/" + path.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","")
+        self.all_files = "dataset/CUB/images/CUB_200_2011/images/*/*.jpg"
+        self.root_folder_name = "CUB"
+        self.experiment_name = "cub"
+    
+    def get_attributes(self):
+        attributes_file = "dataset/CUB/metadata/attributes.txt"
+        lines = open(attributes_file).read().strip().split("\n")
+        attributes = [i.split(" ")[1] for i in lines]
+        return attributes
+
+class XOR_Dataset(Dataset):
+    def __init__(self):
+        self.experiment_name = "xor"
+    def get_attributes(self):
+        return ['0','1']
+    
+class Unfiled_Dataset(Dataset):
+    def __init__(self):
+        self.experiment_name = "unfiled"
+
 
 def add_gaussian_noise(img_array,mean,standard_deviation):
     """Given a numpy array representing an image, add gaussian noise to the array
@@ -58,64 +192,6 @@ def write_new_image_function(input_path,output_path,func):
         
     output_image = Image.fromarray(new_arr)
     output_image.save(output_path)
-    
-def run_function_MNIST(output_folder_name,func):
-    """Run some function over all MNIST files, based on what the output folder should be called
-    
-    Arguments: 
-        output_folder_name: Striong representing which folder everything should be written to, like colored_mnist_robustness
-        func: Some function that takes in an image_array and outputs an image_array
-    
-    Returns: Nothing
-    
-    Side Effects: Runs some function over all images in MNIST, and saves it in output_folder
-    """
-    
-    all_input_files = glob.glob("dataset/colored_mnist/images/*/*.png")
-    
-    for input_file in all_input_files:
-        corresponding_output = input_file.replace("colored_mnist",output_folder_name)
-        write_new_image_function(input_file,corresponding_output,func)
-        
-def create_gaussian_MNIST():
-    """Create the robustness MNIST dataset by running Gaussian Noise over all MNIST images
-    
-    Arguments: Nothing
-    
-    Returns: Nothing
-    
-    Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
-    """
-    
-    flip_probability = .01    
-    for file_name in ["train","val"]:
-        flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
-                                 "dataset/colored_mnist_image_robustness/images/{}.pkl".format(file_name),
-                                 flip_probability,
-                                 lambda s: s.replace("colored_mnist","colored_mnist_image_robustness"))
-    
-    run_function_MNIST("colored_mnist_image_robustness",lambda arr: add_gaussian_noise(arr,0,50))
-    
-def create_junk_MNIST():
-    """Create the responsiveness MNIST dataset by creating Junk Images over all MNIST images
-    
-    Arguments: Nothing
-    
-    Returns: Nothing
-    
-    Side Effects: Adds Gaussian Noise to all images in colored_mnist_robustness
-    """
-    
-    flip_probability = 0.5
-    
-    for file_name in ["train","val"]:
-        flip_concept_labels_file("dataset/colored_mnist/images/{}.pkl".format(file_name),
-                                 "dataset/colored_mnist_image_responsiveness/images/{}.pkl".format(file_name),
-                                 flip_probability,
-                                 lambda s: s.replace("colored_mnist","colored_mnist_image_responsiveness"))
-
-    run_function_MNIST("colored_mnist_image_responsiveness", create_junk_image)
-
         
 def flip_concept_labels(concept_list,flip_prob,img_path_update):
     """Flip probabilities of concept labels according to some probability
@@ -188,205 +264,8 @@ def delete_files_in_directory(directory_name):
     [f.unlink() for f in Path(directory_name).glob("*") if f.is_file()] 
 
 
-def get_cub_attributes():
-    """Get the list of attributes used in CUB classification
-    These are stored in the attributes.txt file
-    
-    Arguments: None
-    
-    Returns: String list of attributes
-    """
-    
-    attributes_file = "dataset/CUB/metadata/attributes.txt"
-    lines = open(attributes_file).read().strip().split("\n")
-    attributes = [i.split(" ")[1] for i in lines]
-    return attributes
-
-def get_mnist_attributes():
-    """Get the lit of attributes used in Colored MNIST
-    This is 0_color, 0_number... and spurious 
-    
-    Arguments: None
-    
-    Returns: String list of attributes
-    """
-    
-    attributes = []
-    
-    for i in range(10):
-        attributes += ["{}_color".format(i),"{}_number".format(i)]
-
-    attributes += ["spurious"]
-    return attributes
-
-def load_cub_split(split_name,seed=-1):
-    """Get the information on which datapoints are used for split_name
-    
-    Arguments:
-        split_name: Either train, val, or test
-        seed: Optional random number that sets the order of data
-        
-    Returns:
-        List of Dictionaries, which contain information on data for 
-            that split
-    """
-    
-    if split_name not in ["train","val","test"]:
-        raise Exception("{} not a valid split".format(split_name))
-
-    file_name = "dataset/CUB/preprocessed/{}.pkl".format(split_name)
-    data = pickle.load(open(file_name,"rb"))
-    
-    if seed>-1:
-        random.seed(seed)
-    random.shuffle(data)
-    
-    return data
-
-def load_mnist(seed=-1,suffix=''):
-    """Load the MNIST dictionary, along with concept values from train.pkl
-    
-    Arguments: Seed: Optional number that changes the order of data
-        Suffix: Optional, potential variant of the MNIST dataset
-    
-    Returns: List of dictionaries, containing info on each colored MNIST data point"""
-    
-    file_name = "dataset/colored_mnist{}/images/{}.pkl".format(suffix,"train")
-    data = pickle.load(open(file_name,"rb"))
-    
-    if seed > -1:
-        random.seed(seed)
-    random.shuffle(data)
-    return data
-    
-def get_cub_images_by_attribute(attribute_name):
-    """Return a list of bird image files with some attribute
-    
-    Arguments: 
-        attribute_name: One of the 112 attributes in attributes.txt
-
-    Returns:
-        String list, with the locations of each image containing attribute
-    """
-    
-    all_attributes = get_cub_attributes()
-    if attribute_name not in all_attributes:
-        raise Exception("{} not found in the 112 CUB attributes".format(attribute_name))
-        
-    attribute_index = all_attributes.index(attribute_name)
-    train_data = load_cub_split("train")
-    
-    unfiltered_image_locations = [i['img_path'] for i in train_data if i['attribute_label'][attribute_index] == 1]
-    filtered_image_locations = [i.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","") 
-                                 for i in unfiltered_image_locations]
-    prefix = "dataset/CUB/images/"
-    filtered_image_locations = [prefix+i for i in filtered_image_locations]
-    return filtered_image_locations
-
-def get_cub_classes_by_attribute(attribute_name):
-    """Return a list of CUB bird types that have a particular attribute
-    Note that, because of the CUB data collection method, all birds in a particular class
-    have the same attributes
-    
-    Arguments: 
-        attribute_name: One of the 112 attributes.txt
-        
-    Returns:
-        String list, with the name of bird types
-    """
-    
-    image_locations = get_cub_images_by_attribute(attribute_name)
-    bird_types = [i.split("/")[5].split(".")[1].replace("_"," ") for i in image_locations]
-    
-    return sorted(list(set(bird_types)))
-    
-
-def get_mnist_images_by_attribute(attribute_name,suffix):
-    """Return a list of MNIST image files with some attribute
-    
-    Arguments: 
-        attribute_name: One of 0_color, 0_number, or spurrious
-
-    Returns:
-        String list, with the locations of each image containing attribute
-    """
-    
-    mnist_data = load_mnist(suffix=suffix)
-    mnist_attributes = get_mnist_attributes()
-    attribute_index = mnist_attributes.index(attribute_name)
-    
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['attribute_label'][attribute_index] == 1]
-    return matching_attributes
-
-def get_cub_images_without_attribute(attribute_name,folder_num=0):
-    """Returns a list of bird image files without some attribute
-    
-    Arguments:
-        attribute_name: One of the 112 attributes in attributes.txt
-        folder_num: Optional, unused parameter which can allow us to specify which images without attribute we're taking
-
-    Returns:
-        String list, with the locations of each image without the attribute
-    """
-    
-    all_attributes = get_cub_attributes()
-    train_data = load_cub_split("train")
-    all_image_locations = [i['img_path'].replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","") 
-                                 for i in train_data]
-    prefix = "dataset/CUB/images/"
-    all_image_locations = [prefix+i for i in all_image_locations]
-    
-    locations_with_attribute = get_cub_images_by_attribute(attribute_name)
-    locations_with_attribute = set(locations_with_attribute)
-    
-    locations_without_attribute = [i for i in all_image_locations if i not in locations_with_attribute]
-    return locations_without_attribute
-
-def get_mnist_images_without_attribute(attribute_name,suffix='',folder_num=0):
-    """Return a list of MNIST image files without some attribute
-    
-    Arguments: 
-        attribute_name: One of 0_color, 0_number, or spurrious
-
-    Returns:
-        String list, with the locations of each image lacking the attribute
-    """
-    
-    mnist_data = load_mnist(suffix=suffix)
-    mnist_attributes = get_mnist_attributes()
-    
-    attribute_index = mnist_attributes.index(attribute_name)
-    
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['attribute_label'][attribute_index] == 0]
-    return matching_attributes
-
-def get_mnist_images_without_attribute_one_class(attribute_name,suffix='',folder_num=0):
-    """Return a list of MNIST image files without some attribute, 
-        where all images are from one class
-    
-    Arguments: 
-        attribute_name: One of 0_color, 0_number, or spurrious
-
-    Returns:
-        String list, with the locations of each image lacking the attribute
-    """
-    
-    mnist_data = load_mnist(suffix=suffix)
-    
-    # Find some random class without the attribute
-    random_class = folder_num % 10 
-    
-    mnist_attributes = get_mnist_attributes()
-    attribute_index = mnist_attributes.index(attribute_name)
-    
-    matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class and i['attribute_label'][attribute_index] == 0]
-    if len(matching_attributes) == 0:
-        matching_attributes = ['dataset/'+i['img_path'] for i in mnist_data if i['class_label'] == random_class] 
-    
-    return matching_attributes
-
-
-def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction,suffix='',images_per_folder=50,seed=-1):
+def create_random_folder_without_attribute(attribute_name, num_folders, attribute_antifunction,
+                                           suffix='',images_per_folder=50,seed=-1):
     """Create new folders, with each folder containing birds without a particular attribute
     
     Arguments:
@@ -410,7 +289,7 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
         random.seed(seed)
     
     for folder_num in range(num_folders):
-        image_locations = attribute_antifunction(attribute_name,folder_num=folder_num,suffix=suffix)
+        image_locations = attribute_antifunction(attribute_name,suffix=suffix,seed=seed)
         folder_location = "dataset/images/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
             os.mkdir(folder_location)
@@ -441,7 +320,8 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     if seed > -1:
         random.seed(seed)
     
-    image_locations = attribute_function(attribute_name,suffix=suffix)
+    image_locations = attribute_function(attribute_name,suffix=suffix,seed=seed)
+    
     folder_location = "dataset/images/{}".format(attribute_name)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)

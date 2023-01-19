@@ -2,24 +2,34 @@ from src.concept_vectors import *
 from src.download_data import *
 import os
 import numpy as np
-from src.dataset import get_cub_attributes
+from src.dataset import *
 
 def test_label_cub():
-    all_attributes = get_cub_attributes()
+    dataset = CUB_Dataset()
+    all_attributes = dataset.get_attributes()
 
-    assert len(create_vector_from_label_cub(all_attributes[0])) > 0
-    assert len(create_vector_from_label_cub(all_attributes[1])) > 0
+    assert len(create_vector_from_label(all_attributes[0],dataset)) > 0
+    assert len(create_vector_from_label(all_attributes[1],dataset)) > 0
+
+def test_label_mnist():
+    dataset = MNIST_Dataset()
+    all_attributes = dataset.get_attributes()
+
+    assert len(create_vector_from_label(all_attributes[0],dataset)) > 0
+    assert len(create_vector_from_label(all_attributes[1],dataset)) > 0
     
 def test_tcav_cub():
-    all_attributes = get_cub_attributes()
+    dataset = CUB_Dataset()
     
-    image_locations = get_cub_images_by_attribute(all_attributes[0])
+    all_attributes = dataset.get_attributes()
+    
+    image_locations = dataset.get_images_with_attribute(all_attributes[0])
     assert len(image_locations) > 0
     assert os.path.exists(image_locations[0])    
     
-    assert len(get_cub_images_by_attribute(all_attributes[10])) > 0
+    assert len(dataset.get_images_with_attribute(all_attributes[10])) > 0
     
-    assert create_tcav_cub(all_attributes[0],2,seed=42) == None
+    assert create_tcav_dataset(all_attributes[0],dataset,2,seed=42) == None
     assert os.path.exists("./results/cavs/cub/42/{}-random500_0-mixed4c-linear-0.1.pkl".format(all_attributes[0]))
     
 def test_cem():
@@ -61,7 +71,8 @@ def test_tcav():
     assert alga_tcav.shape[1] > 100
     
 if __name__ == "__main__":
-    test_tcav()
     test_cem()
     test_tcav_cub()
     test_label_cub()
+    test_label_mnist()
+    test_tcav()

@@ -86,57 +86,36 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
-def create_vector_from_label_cub(attribute_name,seed=-1):
+def create_vector_from_label(attribute_name,dataset,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
         the presence of the attribute in data point 1, and not present in datapoints 0, 2
         
     Arguments:
-        attribute_name: String representing one of the 112 CUB attributes
+        attribute_name: String representing one of the attributes
+        dataset: Object from the Dataset class
 
     Returns:
         concept_vector: Numpy vector representing the concept vector for the attribute
     """
     
-    all_attributes = get_cub_attributes()
+    all_attributes = dataset.get_attributes()
     if attribute_name not in all_attributes:
         raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
     index = all_attributes.index(attribute_name)
     
-    train_data = load_cub_split('train',seed=seed)
+    train_data = dataset.get_data(seed=seed)
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_vector_from_label_mnist(attribute_name,seed=-1,suffix=''):
-    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
-        This produces a 0-1 vector, with the vector <0,1,0> representing
-        the presence of the attribute in data point 1, and not present in datapoints 0, 2
-        
-    Arguments:
-        attribute_name: String representing one of the MNIST attributes
-        suffix: String representing if we run a variant of the MNIST dataset, such as mnist_robustness
-
-    Returns:
-        concept_vector: Numpy vector representing the concept vector for the attribute
-    """
-    
-    mnist_data = load_mnist(seed,suffix=suffix)    
-    mnist_attributes = get_mnist_attributes()
-    
-    attribute_to_index = {}
-    for i,attribute in enumerate(mnist_attributes):
-        attribute_to_index[attribute] = i
-    
-    concept_vector = [i['attribute_label'][attribute_to_index[attribute_name]] for i in mnist_data]
-    return np.array(concept_vector).reshape((1,len(concept_vector)))
-
-def create_tcav_cub(attribute_name,num_random_exp,max_examples=100,images_per_folder=50,seed=-1):
-    """Helper function to create TCAV from CUB Attribute
+def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="GoogleNet",bottlenecks=["mixed4c"]):
+    """Helper function to create TCAV from Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
     
     Arguments:
-        attribute_name: String containing one of the 112 CUB attributes
+        attribute_name: String containing one of the attributes for a dataset
+        dataset: Object from the dataset class
         num_random_exp: How many random experiments to run
         max_examples: In the positive examples (attributes), how many images should there be 
         images_per_folder: In the random folders, how many images there should be 
@@ -149,44 +128,20 @@ def create_tcav_cub(attribute_name,num_random_exp,max_examples=100,images_per_fo
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
-    create_folder_from_attribute(attribute_name,get_cub_images_by_attribute,seed,num_images=max_examples)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_cub_images_without_attribute,images_per_folder,seed=seed)
+    create_folder_from_attribute(attribute_name,
+                                 dataset.get_images_with_attribute,num_images=max_examples,suffix=suffix,seed=seed)
+    create_random_folder_without_attribute(
+        attribute_name,num_random_exp,dataset.get_images_without_attribute,
+        images_per_folder=images_per_folder,seed=seed,suffix=suffix)
     
     concepts = [attribute_name]
     target = "zebra"
-    model_name = "GoogleNet"
-    bottlenecks = ["mixed4c"]
     alphas = [0.1]
     
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="cub",alphas=[0.1],seed=seed,max_examples=max_examples)
+    create_tcav_vectors(concepts,target,model_name,bottlenecks,
+                        num_random_exp,experiment_name=dataset.experiment_name,
+                        alphas=[0.1],seed=seed,max_examples=max_examples)
 
-def create_tcav_mnist(attribute_name,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix=''):
-    """Helper function to create TCAV from MNIST Attribute
-        It creates the folder with images for the attribute, trains the TCAV vector,
-        then deletes the folder
-    
-    Arguments:
-        attribute_name: String containing one of the MNIST attriubtes
-        num_random_exp: How many random images to compare to for each attribute
-        suffix: String for if we're running a special type of the MNIST dataset, such as mnist_robustness
-
-    Returns:
-        None
-        
-    Side Effects:
-        Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
-    """
-    
-    create_folder_from_attribute(attribute_name,get_mnist_images_by_attribute,seed=seed,suffix=suffix,num_images=max_examples)
-    create_random_folder_without_attribute(attribute_name,num_random_exp,get_mnist_images_without_attribute,suffix=suffix,images_per_folder=images_per_folder,seed=seed)
-    
-    concepts = [attribute_name]
-    target = "zebra"
-    model_name = "GoogleNet"
-    bottlenecks = ["mixed4c"]
-    alphas = [0.1]
-    
-    create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,experiment_name="mnist"+suffix,alphas=[0.1],seed=seed,max_examples=max_examples)
 
 def delete_previous_activations(bottleneck,attribute_list):
     """Delete all the previous activations so we can generate them 
@@ -228,14 +183,13 @@ def load_activations_model(experiment_name,max_examples,model_name):
     if model_name not in models_used:
         raise Exception("Model {} not implemented yet, select one of {}".format(model_name,models_used))
         
-    with sess as utils.create_session():
-        if model_name == "GoogleNet":
-            GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
-            LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
-            mymodel = model.GoogleNetWrapper_public(sess,
-                                            GRAPH_PATH,
-                                            LABEL_PATH)
-            
+    sess = utils.create_session()
+    if model_name == "GoogleNet":
+        GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
+        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+        mymodel = model.GoogleNetWrapper_public(sess,
+                                        GRAPH_PATH,
+                                        LABEL_PATH)
     act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
     return act_generator
     
@@ -269,7 +223,7 @@ def get_activations_dictionary(attribute_list,model_name="GoogleNet",
         
     return acts
 
-def reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,botteneck,alpha):
+def reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottleneck,alpha):
     """Delete all TCAV files in the CAV directory so we can re-train them 
     
     Arguments:
@@ -326,9 +280,9 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     if not os.path.exists(cav_dir):
         os.makedirs(cav_dir)
     else:
-        reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottenecks[0],alphas[0])
+        reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottlenecks[0],alphas[0])
 
-
+    sess = utils.create_session()
     mytcav = tcav.TCAV(sess,
                    target,
                    concepts,
@@ -344,62 +298,49 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     mytcav.params = mytcav.get_params()
     
     mytcav.run(run_parallel=False)
-    sess.close()
 
 def load_tcav_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings
     
     Arguments:
         attribute: Which TCAV concept we're looking to get vectors for, as a string
-        dataset: String which is either mnist or cub
+        dataset: Object from the datastet class
     
     Returns: 
         Numpy array of TCAV vectors
     """
         
-    return load_tcav_vectors(attribute,['mixed4c'],experiment_name=dataset,seed=seed)[0]
+    return load_tcav_vectors(attribute,['mixed4c'],experiment_name=dataset.experiment_name,seed=seed)[0]
 
 def load_label_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
     
     Arguments:
         attribute: Which concept we're looking to get vectors for, as a string
-        dataset: String which is either mnist or cub
+        dataset: Object from the dataset class
     
     Returns: 
         Numpy array of label-based vectors
     """
     
-    if dataset == 'cub':
-        vector = create_vector_from_label_cub(attribute,seed=seed)
-    elif dataset in ['mnist','mnist_image_responsiveness','mnist_image_robustness']:
-        vector = create_vector_from_label_mnist(attribute,seed=seed,suffix=dataset.replace("mnist",""))
-    else:
-        raise Exception("{} not implemented".format(dataset))
-        
+    vector = create_vector_from_label(attribute,dataset,seed=seed)
+    
     return np.array(vector)
-
+            
 def load_cem_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to create vector from cub/mnist that is standardized across embeddings
     
     Arguments:
         attribute: Which concept we're looking to get vectors for, as a string
-        dataset: String which is either mnist or cub
+        dataset: Object from the dataset class
     
     Returns: 
         Numpy array of label-based vectors
     """
     
-    if dataset == 'cub':
-        all_attributes = get_cub_attributes()
-    elif dataset == 'mnist':
-        all_attributes = get_mnist_attributes()
-    elif dataset == 'xor':
-        all_attributes = ['0','1']
-        
+    all_attributes = dataset.get_attributes()
     attribute_index = all_attributes.index(attribute)
-        
-    return load_cem_vectors(dataset,attribute_index,seed)
+    return load_cem_vectors(dataset.experiment_name,attribute_index,seed)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
@@ -424,15 +365,20 @@ if __name__ == "__main__":
                         help='Random seed used in tcav experiment')
 
     args = parser.parse_args()
-    
-    if args.algorithm not in ['tcav','tcav_cub','tcav_mnist', 'tcav_mnist_image_robustness', 'tcav_mnist_image_responsiveness']:
-        raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
-        
+            
     if args.algorithm == 'tcav':
-        create_tcav_vectors([args.class_name],args.target,args.model_name,[args.bottleneck],args.num_random_exp,alphas=[args.alpha],seed=args.seed)
+        create_tcav_vectors([args.class_name],args.target,args.model_name[args.bottleneck],
+                            args.num_random_exp,alphas=[args.alpha],seed=args.seed)
     elif args.algorithm == 'tcav_cub':
         suffix = args.algorithm.replace("tcav_cub","")
-        create_tcav_cub(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed)
+        create_tcav_dataset(args.class_name,CUB_Dataset(),
+                            args.num_random_exp,args.images_per_folder,
+                            seed=args.seed,suffix=suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
     elif 'tcav_mnist' in args.algorithm:
         suffix = args.algorithm.replace("tcav_mnist","")
-        create_tcav_mnist(args.class_name,args.num_random_exp,args.images_per_folder,seed=args.seed,suffix=suffix)
+        create_tcav_dataset(args.class_name,MNIST_Dataset(),
+                            args.num_random_exp,args.images_per_folder,
+                            seed=args.seed,suffix=suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
+    else:
+        raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
+

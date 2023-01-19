@@ -1,6 +1,7 @@
 from src.hierarchy import *
 import numpy as np
 from src.concept_vectors import *
+from src.dataset import *
 
 def test_hierarchy_class():
     h = Hierarchy()
@@ -49,9 +50,9 @@ def test_hierarchy_methods():
     assert h.shape[1] == 4
 
 def test_hierarchy_simplified():
-    h1 = create_hierarchy(create_ward_hierarchy,load_cem_vectors_simple, 'xor',['0','1'],42)
-    h2 = create_hierarchy(create_linkage_hierarchy,load_tcav_vectors_simple, 'unfiled',['soccer','alga'],42)
-    h3 = create_hierarchy(create_linkage_hierarchy,load_label_vectors_simple, 'cub',["has_bill_shape::dagger",'has_bill_shape::hooked_seabird'],42)
+    h1 = create_hierarchy(create_ward_hierarchy,load_cem_vectors_simple, XOR_Dataset(),['0','1'],42)
+    h2 = create_hierarchy(create_linkage_hierarchy,load_tcav_vectors_simple, Unfiled_Dataset(),['soccer','alga'],42)
+    h3 = create_hierarchy(create_linkage_hierarchy,load_label_vectors_simple, CUB_Dataset(),["has_bill_shape::dagger",'has_bill_shape::hooked_seabird'],42)
         
     assert type(h1) == type(h2)
     assert type(h2) == type(h3)
@@ -66,5 +67,5 @@ def test_hierarchy_simplified():
     
 if __name__ == "__main__":
     test_hierarchy_simplified()
-    #test_hierarchy_methods()
-    #test_hierarchy_class()
+    test_hierarchy_methods()
+    test_hierarchy_class()
