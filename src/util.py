@@ -234,3 +234,107 @@ def load_pb(path_to_pb):
         graph_def = tf.compat.v1.GraphDef()
         graph_def.ParseFromString(f.read())
     return graph_def
+
+def perturb_weights(w):
+    """Given a set of weights, modify each slightly
+    
+    Arguments:
+        w: Numpy array of weights, with different arrays having different sizes potentially
+        
+    Returns:
+        Numpy array of weights
+    """
+    
+    for i in range(len(w)):
+        w[i] *= np.random.uniform(low=0.95,high=1.05,size=w[i].shape)
+        
+    return w
+
+def responsive_weights(w):
+    """Given a set of weights, modify each significantly 
+    
+    Arguments:
+        w: Numpy array of weights, with different arrays having different sizes potentially
+        
+    Returns:
+        Numpy array of weights
+    """
+    
+    for i in range(len(w)):
+        w[i] *= np.random.uniform(low=-1,high=1,size=w[i].shape)
+        
+    return w
+
+def save_resnet_model(modification_function,output_file):
+    """Save a Resnet50 model, modifying the weights according to some modification function
+    
+    Arguments:
+        modification_function: Function that takes in a numpy array and outputs a numpy array
+        output_file: Location to store the .h5 model 
+
+    Returns: Nothing
+    
+    Side Effects: Saves a Resnet model
+    """
+    
+    m = tf.keras.applications.Resnet50(
+        include_top=True,
+        weights="imagenet",
+        input_tensor=None,
+        input_shape=None,
+        pooling=None,
+        classes=1000,
+    )
+    
+    m.compile(optimizer='Adam',
+              loss='sparse_categorical_crossentropy')
+    
+    weights = np.array(m.get_weights())  
+    new_weights = modification_function(weights)
+    m.set_weights(new_weights)
+    
+    m.save(output_file)
+
+def save_vgg_model(modification_function,output_file):
+    """Save a Vgg16 model, modifying the weights according to some modification function
+    
+    Arguments:
+        modification_function: Function that takes in a numpy array and outputs a numpy array
+        output_file: Location to store the .h5 model 
+
+    Returns: Nothing
+    
+    Side Effects: Saves a Resnet model
+    """
+    
+    m = tf.keras.applications.VGG16(
+        include_top=True,
+        weights="imagenet",
+        input_tensor=None,
+        input_shape=None,
+        pooling=None,
+        classes=1000,
+    )
+    
+    m.compile(optimizer='Adam',
+              loss='sparse_categorical_crossentropy')
+    
+    weights = np.array(m.get_weights())  
+    new_weights = modification_function(weights)
+    m.set_weights(new_weights)
+    
+    m.save(output_file)
+    
+def resave_models():
+    """Resave all 3 types of VGG models
+    
+    Arguments: None
+    
+    Returns: None
+    
+    Side Effects: Re-saves the three types of models
+    """
+    
+    save_vgg_model(lambda w: w,'./dataset/models/keras/model_vgg16.h5')
+    save_vgg_model(perturb_weights,'./dataset/models/keras/model_vgg16_robust.h5')
+    save_vgg_model(responsive_weights,'./dataset/models/keras/model_vgg16_responsive.h5')

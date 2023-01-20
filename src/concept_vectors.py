@@ -13,6 +13,14 @@ from src.dataset import *
 import random
 import glob
 
+class ResnetWrapper(model.KerasModelWrapper):
+    def get_image_shape(self):
+        return np.array([224,224,3])
+    
+class VggWrapper(model.KerasModelWrapper):
+    def get_image_shape(self):
+        return np.array([128,128,3])
+
 def load_cem_vectors(experiment_name,concept_number,seed=-1):
     """Load all the 'active' embeddings from Concept Embedding Models
     
@@ -108,7 +116,7 @@ def create_vector_from_label(attribute_name,dataset,seed=-1):
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="GoogleNet",bottlenecks=["mixed4c"]):
+def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="VGG16",bottlenecks=["mixed4c"]):
     """Helper function to create TCAV from Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -128,6 +136,11 @@ def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,i
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
     
+    if suffix == '_model_robustness':
+        model_name = "VGG16_Robustness"
+    elif suffix == '_model_responsiveness':
+        model_name = "VGG16_Responsiveness"
+    
     create_folder_from_attribute(attribute_name,
                                  dataset.get_images_with_attribute,num_images=max_examples,suffix=suffix,seed=seed)
     create_random_folder_without_attribute(
@@ -139,7 +152,7 @@ def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,i
     alphas = [0.1]
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,
-                        num_random_exp,experiment_name=dataset.experiment_name,
+                        num_random_exp,experiment_name=dataset.experiment_name+suffix,
                         alphas=[0.1],seed=seed,max_examples=max_examples)
 
 
@@ -178,7 +191,9 @@ def load_activations_model(experiment_name,max_examples,model_name):
     
     image_dir = "./dataset/images"
     activation_dir = './results/activations'
-    models_used = ["GoogleNet"]
+    models_used = ["GoogleNet",
+                   "Resnet50","Resnet50Robustness","Resnet50Responsiveness",
+                  "VGG16","VGG16Robustness","VGG16Responsiveness"]
     
     if model_name not in models_used:
         raise Exception("Model {} not implemented yet, select one of {}".format(model_name,models_used))
@@ -190,10 +205,35 @@ def load_activations_model(experiment_name,max_examples,model_name):
         mymodel = model.GoogleNetWrapper_public(sess,
                                         GRAPH_PATH,
                                         LABEL_PATH)
+    elif "Resnet50" in model_name:
+        if model_name == "Resnet50":
+            GRAPH_PATH = "./dataset/models/resnet50/baseline.h5"
+        elif model_name == "Resnet50Robust":
+            GRAPH_PATH = "./dataset/models/resnet50/robust.h5"
+        elif model_name == "Resnet50Responsive":
+            GRAPH_PATH = "./dataset/models/resnet50/responsive.h5"
+            
+        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+        mymodel = model.ResnetWrapper(sess,
+                                        GRAPH_PATH,
+                                        LABEL_PATH)
+    elif "VGG16" in model_name:
+        if model_name == "VGG16":
+            GRAPH_PATH = './dataset/models/keras/model_vgg16.h5'
+        elif model_name == "VGG16Robustness":
+            GRAPH_PATH = './dataset/models/keras/model_vgg16_robust.h5'
+        elif model_name == "VGG16Responsiveness":
+            GRAPH_PATH = './dataset/models/keras/model_vgg16_responsive.h5'
+            
+        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+        mymodel = model.ResnetWrapper(sess,
+                                        GRAPH_PATH,
+                                        LABEL_PATH)
+        
     act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
     return act_generator
     
-def get_activations_dictionary(attribute_list,model_name="GoogleNet",
+def get_activations_dictionary(attribute_list,model_name="VGG16",
                                experiment_name="unfiled",max_examples=500,bottleneck="mixed4c"):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
