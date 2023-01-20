@@ -5,7 +5,7 @@ import torchvision
 from torch.utils.data import Dataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-from torchvision.models import resnet50
+from torchvision.models import resnet50, vgg16
 from experiments.synthetic_datasets_experiments import generate_xor_data
 from torch.utils.data import TensorDataset, DataLoader
 from cem.data.CUB200.cub_loader import load_data
@@ -73,7 +73,7 @@ def generate_data_loaders_xor():
     
     return train_dl, valid_dl
 
-def generate_data_loaders_cub():
+def generate_data_loaders_cub(suffix):
     """Generate the train and validation dataloaders for the birds dataset
     
     Parameters: None
@@ -82,9 +82,9 @@ def generate_data_loaders_cub():
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    cub_location = '../ConceptBottleneck/CUB/data'
-    train_data_path = cub_location+'/class_attr_data_10/train.pkl'
-    valid_data_path = cub_location+'/class_attr_data_10/val.pkl'
+    cub_location = '../../main_code/CUB{}'.format(suffix)
+    train_data_path = cub_location+'/preprocessed/train.pkl'
+    valid_data_path = cub_location+'/preprocessed/val.pkl'
     
     train_dl = load_data(
         pkl_paths=[train_data_path],
@@ -93,9 +93,9 @@ def generate_data_loaders_cub():
         batch_size=64,
         uncertain_label=False,
         n_class_attr=2,
-        image_dir=cub_location+'/CUB_200_2011/images/',
+        image_dir=cub_location+'/images/CUB_200_2011/images/',
         resampling=False,
-        root_dir=cub_location+'/CUB_200_2011',
+        root_dir=cub_location+'/images/CUB_200_2011',
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
             '/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/CUB_200_2011/',
@@ -109,9 +109,9 @@ def generate_data_loaders_cub():
         batch_size=64,
         uncertain_label=False,
         n_class_attr=2,
-        image_dir=cub_location+'/CUB_200_2011/images/',
+        image_dir=cub_location+'/images/CUB_200_2011/images/',
         resampling=False,
-        root_dir=cub_location+'/CUB_200_2011',
+        root_dir=cub_location+'/images/CUB_200_2011',
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
             '/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/CUB_200_2011/',
@@ -120,7 +120,7 @@ def generate_data_loaders_cub():
     
     return train_dl, valid_dl
 
-def generate_data_loaders_mnist():
+def generate_data_loaders_mnist(suffix):
     """Generate the train and validation dataloaders for the MNIST dataset
     
     Parameters: None
@@ -129,7 +129,7 @@ def generate_data_loaders_mnist():
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    mnist_location = '../../main_code/dataset/colored_mnist'
+    mnist_location = '../../main_code/dataset/colored_mnist{}'.format(suffix)
     train_data_path = mnist_location+'/images/train.pkl'
     valid_data_path = mnist_location+'/images/val.pkl'
     
@@ -189,18 +189,25 @@ if __name__ == "__main__":
     pl.seed_everything(args.seed, workers=True)
     selected_concepts = retrieve_selected_concepts()
 
+    experiment_name_split = experiment_name.split("_")
+    experiment_name = experiment_name_split[0]
+    if len(experiment_name_split)>1:
+        suffix = "_".join(experiment_name_split[1:])
+    else:
+        suffix = ""
+    
     if experiment_name == "xor":
         train_dl, valid_dl = generate_data_loaders_xor()
         n_concepts = 2
         n_tasks = 2
 
     elif experiment_name == "cub":
-        train_dl, valid_dl = generate_data_loaders_cub()
+        train_dl, valid_dl = generate_data_loaders_cub(suffix)
         n_concepts = 112
         n_tasks = 200
 
     elif experiment_name == "mnist":
-        train_dl, valid_dl = generate_data_loaders_mnist()
+        train_dl, valid_dl = generate_data_loaders_mnist(suffix)
         n_concepts = 10 + 10 + 1
         n_tasks = 10
     
@@ -211,9 +218,17 @@ if __name__ == "__main__":
     if experiment_name == "xor":
         extractor_arch = c_extractor_arch
     elif experiment_name == "cub":
-        extractor_arch = resnet50
+        extractor_arch = vgg16
     elif experiment_name == 'mnist':
-        extractor_arch = resnet50
+        extractor_arch = vgg16
+        
+    existing_weights = ''
+    if suffix == '_model_robustness':
+        exisitng_weights = 'vgg16_robustness.pt'
+    elif suffix == '_model_responsiveness':
+        existing_weights = 'vgg16_responsiveness.pt'
+        
+    existing_weights = 'vgg16.pt'
 
     cem_model = ConceptEmbeddingModel(
       n_concepts=n_concepts, # Number of training-time concepts
@@ -225,7 +240,8 @@ if __name__ == "__main__":
       c_extractor_arch=extractor_arch, # Replace this appropriately
       training_intervention_prob=0.25, # RandInt probability
       experiment_name=experiment_name, 
-      seed=seed
+      seed=seed, 
+      existing_weights = existing_weights,
     )
     
     trainer = pl.Trainer(

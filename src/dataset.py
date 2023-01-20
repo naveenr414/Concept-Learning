@@ -12,6 +12,9 @@ class Dataset:
         pass
     
     def get_data(self,seed=-1,suffix=""):
+        if suffix == "_model_robustness" or suffix == "_model_responsiveness":
+            suffix = ""
+        
         file_name = self.pkl_path.format(suffix)
         data = pickle.load(open(file_name,"rb"))
 

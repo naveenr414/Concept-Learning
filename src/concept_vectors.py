@@ -12,14 +12,15 @@ import argparse
 from src.dataset import *
 import random
 import glob
+import tensorflow as tf
 
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
         return np.array([224,224,3])
     
-class VggWrapper(model.KerasModelWrapper):
+class VGGWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
-        return np.array([128,128,3])
+        return np.array([224,224,3])
 
 def load_cem_vectors(experiment_name,concept_number,seed=-1):
     """Load all the 'active' embeddings from Concept Embedding Models
@@ -116,7 +117,7 @@ def create_vector_from_label(attribute_name,dataset,seed=-1):
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
-def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="VGG16",bottlenecks=["mixed4c"]):
+def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="VGG16",bottlenecks=["block4_conv1"]):
     """Helper function to create TCAV from Attribute
         It creates the folder with images for the attribute, trains the TCAV vector,
         then deletes the folder
@@ -135,11 +136,14 @@ def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,i
     Side Effects:
         Trains a set of concept vectors, stored at ./results/cavs/experiment_name/seed
     """
+    experiment_name = dataset.experiment_name+suffix
     
     if suffix == '_model_robustness':
-        model_name = "VGG16_Robustness"
+        model_name = "VGG16Robustness"
+        
     elif suffix == '_model_responsiveness':
-        model_name = "VGG16_Responsiveness"
+        model_name = "VGG16Responsiveness"
+        
     
     create_folder_from_attribute(attribute_name,
                                  dataset.get_images_with_attribute,num_images=max_examples,suffix=suffix,seed=seed)
@@ -152,7 +156,7 @@ def create_tcav_dataset(attribute_name,dataset,num_random_exp,max_examples=100,i
     alphas = [0.1]
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,
-                        num_random_exp,experiment_name=dataset.experiment_name+suffix,
+                        num_random_exp,experiment_name=experiment_name,
                         alphas=[0.1],seed=seed,max_examples=max_examples)
 
 
@@ -176,14 +180,14 @@ def delete_previous_activations(bottleneck,attribute_list):
             os.remove(activation_file_location)
 
     
-def load_activations_model(experiment_name,max_examples,model_name):
+def load_activations_model(experiment_name,max_examples,model_name,sess):
     """Given a model and an experiment name, create an activation class that loads activations
     
     Arguments:
         experiment_name: String representing which experiment we're running; this is a folder in 
             ./dataset/images
         max_examples: Maximum number of activations to load
-        model_name: String representing the model name; currently we only support GoogleNet
+        model_name: String representing the model name; currently we only support GoogleNet, VGG16, and Resnet50
         
     Returns:
         Object from ImageActivationGenerator
@@ -198,7 +202,6 @@ def load_activations_model(experiment_name,max_examples,model_name):
     if model_name not in models_used:
         raise Exception("Model {} not implemented yet, select one of {}".format(model_name,models_used))
         
-    sess = utils.create_session()
     if model_name == "GoogleNet":
         GRAPH_PATH = "./dataset/models/inception5h/tensorflow_inception_graph.pb"
         LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
@@ -208,13 +211,13 @@ def load_activations_model(experiment_name,max_examples,model_name):
     elif "Resnet50" in model_name:
         if model_name == "Resnet50":
             GRAPH_PATH = "./dataset/models/resnet50/baseline.h5"
-        elif model_name == "Resnet50Robust":
+        elif model_name == "Resnet50Robustness":
             GRAPH_PATH = "./dataset/models/resnet50/robust.h5"
-        elif model_name == "Resnet50Responsive":
+        elif model_name == "Resnet50Responsiveness":
             GRAPH_PATH = "./dataset/models/resnet50/responsive.h5"
             
         LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
-        mymodel = model.ResnetWrapper(sess,
+        mymodel = ResnetWrapper(sess,
                                         GRAPH_PATH,
                                         LABEL_PATH)
     elif "VGG16" in model_name:
@@ -226,15 +229,15 @@ def load_activations_model(experiment_name,max_examples,model_name):
             GRAPH_PATH = './dataset/models/keras/model_vgg16_responsive.h5'
             
         LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
-        mymodel = model.ResnetWrapper(sess,
+        mymodel = VGGWrapper(sess,
                                         GRAPH_PATH,
                                         LABEL_PATH)
         
     act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
     return act_generator
     
-def get_activations_dictionary(attribute_list,model_name="VGG16",
-                               experiment_name="unfiled",max_examples=500,bottleneck="mixed4c"):
+def get_activations_dictionary(attribute_list,sess,model_name="VGG16",
+                               experiment_name="unfiled",max_examples=500,bottleneck="block4_conv1"):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
         
@@ -251,12 +254,12 @@ def get_activations_dictionary(attribute_list,model_name="VGG16",
     """
     
     delete_previous_activations(bottleneck,attribute_list)
-    act_generator = load_activations_model(experiment_name,max_examples,model_name)
+    act_generator = load_activations_model(experiment_name,max_examples,model_name,sess)
             
     acts = {}
     for i in attribute_list:
         examples = act_generator.get_examples_for_concept(i)
-        activation_examples = act_generator.model.run_examples(examples, bottlenecks[0])
+        activation_examples = act_generator.model.run_examples(examples, bottleneck)
         acts[i] = activation_examples
         shape = acts[i].shape
         acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
@@ -313,31 +316,34 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
     np.random.seed(seed)
     random.seed(seed)
     
-    act_generator = load_activations_model(experiment_name,max_examples,model_name)
-    delete_previous_activations(bottlenecks[0],concepts)
-    
-    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
-    if not os.path.exists(cav_dir):
-        os.makedirs(cav_dir)
-    else:
-        reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottlenecks[0],alphas[0])
+    config = tf.compat.v1.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.compat.v1.Session(config=config) as sess:
 
-    sess = utils.create_session()
-    mytcav = tcav.TCAV(sess,
-                   target,
-                   concepts,
-                   bottlenecks,
-                   act_generator,
-                   alphas,
-                   cav_dir=cav_dir,
-                   num_random_exp=num_random_exp)#10)
-    
-    # Reset the runs so it doesn't compare random-random
-    mytcav.relative_tcav = True
-    mytcav._process_what_to_run_expand(num_random_exp=num_random_exp+1)
-    mytcav.params = mytcav.get_params()
-    
-    mytcav.run(run_parallel=False)
+        act_generator = load_activations_model(experiment_name,max_examples,model_name,sess)
+        delete_previous_activations(bottlenecks[0],concepts)
+
+        cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
+        if not os.path.exists(cav_dir):
+            os.makedirs(cav_dir)
+        else:
+            reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottlenecks[0],alphas[0])
+
+        mytcav = tcav.TCAV(sess,
+                       target,
+                       concepts,
+                       bottlenecks,
+                       act_generator,
+                       alphas,
+                       cav_dir=cav_dir,
+                       num_random_exp=num_random_exp)#10)
+
+        # Reset the runs so it doesn't compare random-random
+        mytcav.relative_tcav = True
+        mytcav._process_what_to_run_expand(num_random_exp=num_random_exp+1)
+        mytcav.params = mytcav.get_params()
+
+        mytcav.run(run_parallel=False)
 
 def load_tcav_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings
@@ -350,7 +356,7 @@ def load_tcav_vectors_simple(attribute,dataset,seed=-1):
         Numpy array of TCAV vectors
     """
         
-    return load_tcav_vectors(attribute,['mixed4c'],experiment_name=dataset.experiment_name,seed=seed)[0]
+    return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name,seed=seed)[0]
 
 def load_label_vectors_simple(attribute,dataset,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
@@ -391,12 +397,12 @@ if __name__ == "__main__":
     parser.add_argument('--target', type=str,
                         help='Target which the concept vectors are aiming to predict.',default='zebra')
     parser.add_argument('--model_name', type=str,
-                        help='Name of the model used to generate concept vectors',default="GoogleNet")
+                        help='Name of the model used to generate concept vectors',default="VGG16")
     parser.add_argument('--alpha',type=float,
                         help='Regularization parameter to train concept vector',default=0.1)
     parser.add_argument('--bottleneck',type=str,
                         help='Layer of model used when training concept vectors; activations are taken from this',
-                        default='mixed4c')
+                        default='block4_conv1')
     parser.add_argument('--num_random_exp', type=int,
                         help='Number of random ImageNet classes we compare the concept vector with')
     parser.add_argument('--images_per_folder',type=int, default=50,

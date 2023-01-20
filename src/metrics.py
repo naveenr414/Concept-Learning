@@ -62,7 +62,7 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
     return np.mean(distance_list)
     
 def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
-    """Compute the robustness for  metric for a set of random seeds, given a hierarchy+embedding method
+    """Compute the image robustness for  metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
         hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
@@ -96,6 +96,44 @@ def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attrib
 
     return compare_same_images_by_suffix(hierarchy_method,
                                          embedding_method,dataset,attributes,random_seeds,"_image_responsiveness")
+
+def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+    """Compute the model robustness for metric for a set of random seeds, given a hierarchy+embedding method
+    
+    Arguments: 
+        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
+        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+            Simply loads embeddings, does not train them from scratch 
+        dataset: String representing which dataset we're using, such as "cub"
+        attributes: List of attributes we want to create embeddings for
+        random_seeds: List of numbers representing the random seed for the embeddings
+
+    Returns:
+        Float, representing the average distance between each pair of images when perturbed, comparing only like-seeds
+    """
+    
+    return compare_same_images_by_suffix(hierarchy_method,
+                                         embedding_method,dataset,attributes,random_seeds,"_model_robustness")
+
+
+def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+    """Compute the model responsiveness metric for a set of random seeds, given a hierarchy+embedding method
+    
+    Arguments: 
+        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
+        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+            Simply loads embeddings, does not train them from scratch 
+        dataset: String representing which dataset we're using, such as "cub"
+        attributes: List of attributes we want to create embeddings for
+        random_seeds: List of numbers representing the random seed for the embeddings
+
+    Returns:
+         Float, representing the average distance between each pair of images when significantly altered, comparing only like-seeds
+    """
+
+    return compare_same_images_by_suffix(hierarchy_method,
+                                         embedding_method,dataset,attributes,random_seeds,"_model_responsiveness")
+
 
 def reset_dataset(dataset,seed,max_images):
     """Reset the images and the activations for a dataset, then redownload them
