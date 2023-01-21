@@ -49,11 +49,11 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
         Float, representing average paired distance between hierarchies
     """
     
-    if suffix not in ["","_image_robustness","_image_responsiveness"]:
+    if suffix not in ["","_image_robustness","_image_responsiveness","_model_robustness","_model_responsiveness"]:
         raise Exception("{} suffix not supported".format(suffix))
     
-    baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,attributes,seed) for seed in random_seeds]
-    robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset+suffix,attributes,seed) for seed in random_seeds]
+    baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset.experiment_name,attributes,seed) for seed in random_seeds]
+    robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset.experiment_name+suffix,attributes,seed) for seed in random_seeds]
     
     distance_list = []
     for h1,h2 in zip(baseline_hierarchies,robust_hierarchies):
