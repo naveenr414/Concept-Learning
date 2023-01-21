@@ -299,7 +299,7 @@ def create_hierarchy_thresholding(data,metric='euclidean'):
         
     return return_matrix
 
-def create_hierarchy(hierarchy_method, embedding_method, dataset,attributes,random_seed):
+def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed):
     """Create a hierarchy from a set of embeddings and a dataset
     Do this by first creating a distance matrix (pdist-style), then feeding it into hierarchy_method
     
@@ -307,7 +307,8 @@ def create_hierarchy(hierarchy_method, embedding_method, dataset,attributes,rand
         hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
-        dataset: String representing which dataset we're using, such as "cub"
+        dataset: Object from the dataset class
+        suffix: String, which specific instance of the dataset we're using 
         attributes: List of attributes we want to create embeddings for
         random_seed: Number representing the random seed for the embeddings
         
@@ -319,7 +320,7 @@ def create_hierarchy(hierarchy_method, embedding_method, dataset,attributes,rand
     
     embeddings_by_attribute = {}
     for attribute in attributes:
-        embeddings = embedding_method(attribute,dataset,seed=random_seed)
+        embeddings = embedding_method(attribute,dataset,suffix,seed=random_seed)
         embeddings_by_attribute[attribute] = embeddings
         
     for i in range(len(attributes)):

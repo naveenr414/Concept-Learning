@@ -95,7 +95,7 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
-def create_vector_from_label(attribute_name,dataset,seed=-1):
+def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
         the presence of the attribute in data point 1, and not present in datapoints 0, 2
@@ -113,7 +113,7 @@ def create_vector_from_label(attribute_name,dataset,seed=-1):
         raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
     index = all_attributes.index(attribute_name)
     
-    train_data = dataset.get_data(seed=seed)
+    train_data = dataset.get_data(suffix=suffix,seed=seed)
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
@@ -345,40 +345,43 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
 
         mytcav.run(run_parallel=False)
 
-def load_tcav_vectors_simple(attribute,dataset,seed=-1):
+def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings
     
     Arguments:
         attribute: Which TCAV concept we're looking to get vectors for, as a string
         dataset: Object from the datastet class
+        suffix: Strnig representing which specific instance of the dataset we're testing 
     
     Returns: 
         Numpy array of TCAV vectors
     """
         
-    return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name,seed=seed)[0]
+    return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed)[0]
 
-def load_label_vectors_simple(attribute,dataset,seed=-1):
+def load_label_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
     
     Arguments:
         attribute: Which concept we're looking to get vectors for, as a string
         dataset: Object from the dataset class
+        suffix: String, representing which specific instance of the class we're testing 
     
     Returns: 
         Numpy array of label-based vectors
     """
     
-    vector = create_vector_from_label(attribute,dataset,seed=seed)
+    vector = create_vector_from_label(attribute,dataset,suffix,seed=seed)
     
     return np.array(vector)
             
-def load_cem_vectors_simple(attribute,dataset,seed=-1):
+def load_cem_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create vector from cub/mnist that is standardized across embeddings
     
     Arguments:
         attribute: Which concept we're looking to get vectors for, as a string
         dataset: Object from the dataset class
+        suffix: String; which specific instance of the dataset are we testing out 
     
     Returns: 
         Numpy array of label-based vectors
@@ -386,7 +389,7 @@ def load_cem_vectors_simple(attribute,dataset,seed=-1):
     
     all_attributes = dataset.get_attributes()
     attribute_index = all_attributes.index(attribute)
-    return load_cem_vectors(dataset.experiment_name,attribute_index,seed)
+    return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
