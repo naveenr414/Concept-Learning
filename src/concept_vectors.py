@@ -13,6 +13,8 @@ from src.dataset import *
 import random
 import glob
 import tensorflow as tf
+from src.models import *
+from src.util import *
 
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
@@ -95,6 +97,58 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     all_concept_vectors = np.array(all_concept_vectors)
     return all_concept_vectors, concept_meta_info
 
+def create_concept2vec(dataset,suffix,seed=-1,
+                             embedding_size=32,num_epochs=5,dataset_size=1000):
+    """Generate concept2vec vectors by training a Skipgram architecture on correlated concepts
+    
+    Arguments:
+        dataset: Object from the Dataset Class
+        suffix: String that represents a specific variant of the dataset
+        seed: Number for the random seed
+        embedding_size: Size of the embeddings; by default it's 32
+        
+    Returns: Nothing
+    
+    Side Effects: Trains a set of vectors at results/concept2vec/experimentname+suffix/seed/
+    """
+    
+    if seed == -1:
+        seed = random.randint(0,100000)
+    
+    destination_folder = "results/concept2vec/{}/{}".format(dataset.experiment_name+suffix,seed)
+    
+    if not os.path.exists(destination_folder):
+        os.makedirs(destination_folder)
+        
+    attributes = dataset.get_attributes()
+    V = len(attributes)
+    all_data = dataset.get_data(seed,suffix)[:dataset_size]
+    
+    SkipGram = create_skipgram_architecture(embedding_size,V)
+    
+    for _ in range(num_epochs):
+        X = np.zeros((0,2),dtype=np.int32)
+        Y = np.zeros((0,))
+
+        # Collect the dataset
+        for i, doc in enumerate(all_data):
+            formatted_data = [attributes[j] for j,indicator in enumerate(doc['attribute_label']) if indicator == 1]
+            data, labels = generate_skipgram_dataset(formatted_data,attributes,8,8)   
+            
+            data = np.array(data,dtype=np.int32)
+
+            X = np.concatenate([X,data])
+            Y = np.concatenate([Y,labels])
+            
+        X_0 = X[:,0]
+        X_1 = X[:,1]
+        
+        SkipGram.fit([X_0,X_1],Y)
+    
+    vectors = SkipGram.get_weights()[0]
+    
+    np.save(open("{}/vectors.npy".format(destination_folder),"wb"),vectors)
+    
 def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point
         This produces a 0-1 vector, with the vector <0,1,0> representing
@@ -390,6 +444,28 @@ def load_cem_vectors_simple(attribute,dataset,suffix,seed=-1):
     all_attributes = dataset.get_attributes()
     attribute_index = all_attributes.index(attribute)
     return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
+
+def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
+    dataset_location = "results/concept2vec"
+    experiment_name = dataset.experiment_name+suffix
+    
+    if seed == -1:
+        all_seeds = get_seed_numbers(dataset_location+"/"+experiment_name)
+        
+        if len(all_seeds) == 0:
+            raise Exception("No experiments found at {}".format(dataset_location+"/"+experiment_name))
+            
+        seed = all_seeds[random.randint(0,len(all_seeds)-1)]
+        
+    all_vectors = np.load("{}/{}/vectors.npy".format(dataset_location+"/"+experiment_name,seed))
+        
+    all_attributes = dataset.get_attributes()
+    attribute_index = all_attributes.index(attribute)
+    
+    vector = all_vectors[attribute_index,:]
+    return vector.reshape((1,len(vector)))
+    
+    
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
@@ -430,4 +506,3 @@ if __name__ == "__main__":
                             seed=args.seed,suffix=suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
     else:
         raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
-

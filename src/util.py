@@ -143,6 +143,35 @@ def encode_list(class_list):
 
     return [class_to_num[i] for i in class_list]
 
+def list_to_dict(concepts):
+    """Encode a list of concepts into a dictionary, where the keys are concepts
+        and the value is its position in the list
+        
+    Arguments: 
+        concepts: A list of strings
+        
+    Returns: A dictionary with string keys and integer values
+    """
+    
+    d = {}
+    for i, name in enumerate(concepts):
+        d[name] = i
+    
+    return d
+
+def encode_list_all_concepts(concepts,all_concepts_dict):
+    """Encode a list of concepts into a list of numbers, given the true ordering
+    
+    Arguments:
+        concepts: List of string of strings, representing what each concept is
+        all_concepts: List of all concepts; concepts is a subset of all_concepts
+        
+    Returns: List of numbers, a numeric encoding of concepts
+    
+    """
+        
+    return [all_concepts_dict[i] for i in concepts]
+
 def find_unique_in_order(class_list):
     """Get the unique elements of a list, preserving order
         ['dog','cat','cat','dog'] -> ['dog','cat']
@@ -338,3 +367,82 @@ def resave_models():
     save_vgg_model(lambda w: w,'./dataset/models/keras/model_vgg16.h5')
     save_vgg_model(perturb_weights,'./dataset/models/keras/model_vgg16_robust.h5')
     save_vgg_model(responsive_weights,'./dataset/models/keras/model_vgg16_responsive.h5')
+    
+def generate_positive_examples(concept_list,num_examples):
+    """For skipgram training, generate positive examples, where two concepts are co-located in the same
+        example
+        
+    Arguments:
+        concept_list: A list of numbers, each number encoding the presence of a certain concept
+        num_examples: Number of positive pairs to generate
+        
+    Returns: Numpy array of size num_examples x 2 with positive examples
+    """
+    
+    ret_array = []
+    
+    if len(set(concept_list))>1:    
+        for i in range(num_examples):
+            ret_array.append(random.sample(concept_list,2))
+
+    else:
+        return np.zeros((0,2))
+            
+    return np.array(ret_array)
+
+def generate_negative_examples(concept_list,total_concepts, num_examples):
+    """For skipgram training, generate negative examples, where one concept is selected from concept_list and 
+        the other is from total_concepts (and not in concept_list
+
+    Arguments:
+        concept_list: A list of numbers, each number encoding the presence of a certain concept
+        total_concepts: Total number of concepts; used to select the other concept 
+        num_examples: Number of negative pairs to generate
+        
+        
+    Returns: Numpy array of size num_examples x 2 with positive examples
+
+    """
+    
+    ret_array = []
+    concept_list_set = set(concept_list)
+        
+    for i in range(num_examples):
+        example_concept = random.sample(concept_list,1)[0]
+        other_concept = random.randint(0,total_concepts-1)
+        while other_concept in concept_list_set and len(concept_list_set) < total_concepts:
+            other_concept = random.randint(0,total_concepts-1)
+            
+        ret_array.append([example_concept,other_concept])
+        
+    return np.array(ret_array)
+
+def generate_skipgram_dataset(datapoint,all_concepts,num_positive,num_negative):
+    """Generate a skipgram set of datapoints from a single concept list, given a list of concepts
+    
+    Arguments:
+        datapoint: List of strings representing the presence of different concepts
+        all_concepts: All potential concepts in a dataset
+        num_positive: How many positive data points to generate
+        num_negative: Number of negative data points to generate
+    
+    Returns: Numpy array of sizes (num_positive+num_negative x 2) and (num_positive+num_negative x 1) 
+    """
+    
+    all_concepts_dict = list_to_dict(all_concepts)
+    encoded_datapoint = encode_list_all_concepts(datapoint,all_concepts_dict)
+
+    positive = generate_positive_examples(encoded_datapoint, num_positive)
+    negative = generate_negative_examples(encoded_datapoint, len(all_concepts), num_negative)
+    
+    y_positive = np.ones((len(positive),1))
+    y_negative = np.zeros((num_negative,1))
+    
+    whole_positive = np.concatenate([positive,y_positive],axis=1)
+    whole_negative = np.concatenate([negative,y_negative],axis=1)
+    
+    whole_dataset = np.concatenate([whole_positive,whole_negative])
+    
+    np.random.shuffle(whole_dataset)
+    
+    return whole_dataset[:,:2], whole_dataset[:,-1]
