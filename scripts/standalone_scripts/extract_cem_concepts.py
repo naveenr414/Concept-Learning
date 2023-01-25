@@ -11,6 +11,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from cem.data.CUB200.cub_loader import load_data
 import numpy as np
 import argparse
+import random
 
 def retrieve_selected_concepts():
     """The CBM and CEM papers use a subset of the main birds concept
@@ -22,7 +23,7 @@ def retrieve_selected_concepts():
         Returns: List of 0-indexed indicies, which represent attributes that are used
     """
     
-    attributes_file = "../../main_code/dataset/CUB/metadata/attributes.txt"
+    attributes_file = "CUB/metadata/attributes.txt"
     
     f = open(attributes_file).read().strip().split("\n")
     indexes = [int(i.split(" ")[0]) for i in f]
@@ -30,6 +31,20 @@ def retrieve_selected_concepts():
     # Make indexes 0-indexed
     indexes = [i-1 for i in indexes]
     return indexes
+
+def save_vgg16_model(suffix):
+    model = vgg16(pretrained=True)
+    
+    for name, param in model.named_parameters():
+        if suffix == "":
+            random_nums = np.ones(param.shape)
+        elif suffix == "_model_robustness":
+            random_nums = np.random.uniform(low=0.95,high=1.05,size=param.shape)
+        elif suffix == "_model_responsiveness":
+            random_nums = np.random.uniform(low=-1,high=1,size=param.shape)
+        param.data *= torch.Tensor(random_nums)
+    
+    torch.save(model.state_dict(),"vgg16{}.pt".format(suffix))
 
 
 def c_extractor_arch(output_dim):
@@ -82,7 +97,7 @@ def generate_data_loaders_cub(suffix):
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    cub_location = '../../main_code/CUB{}'.format(suffix)
+    cub_location = 'CUB{}'.format(suffix)
     train_data_path = cub_location+'/preprocessed/train.pkl'
     valid_data_path = cub_location+'/preprocessed/val.pkl'
     
@@ -129,7 +144,11 @@ def generate_data_loaders_mnist(suffix):
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    mnist_location = '../../main_code/dataset/colored_mnist{}'.format(suffix)
+    
+    if suffix in ["_model_robustness","_model_responsiveness"]:
+        suffix = ""
+    
+    mnist_location = 'colored_mnist{}'.format(suffix)
     train_data_path = mnist_location+'/images/train.pkl'
     valid_data_path = mnist_location+'/images/val.pkl'
     
@@ -145,7 +164,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            'colored_mnist/',
+            '{}/'.format(mnist_location),
             '')
     )
     
@@ -161,7 +180,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            'colored_mnist/',
+            '{}/'.format(mnist_location),
             '')
     )
     
@@ -177,6 +196,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_epochs',type=int,default=1,help='How many epochs to train for')
     parser.add_argument('--validation_epochs',type=int,default=1,help='How often should we run the validation script')
     parser.add_argument('--seed',type=int,default=42,help='Random seed for training')
+    parser.add_argument('--num_workers',type=int,default=8,help='Number of workers')
+    parser.add_argument('--sample_train',type=float,default=1.0,help='Fraction of the train dataset to sample')
+    parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')
 
     args = parser.parse_args()
     experiment_name = args.experiment_name
@@ -184,7 +206,7 @@ if __name__ == "__main__":
     num_epochs = args.num_epochs
     validation_epochs = args.validation_epochs
     seed = args.seed
-    num_workers = 1
+    num_workers = args.num_workers
 
     pl.seed_everything(args.seed, workers=True)
     selected_concepts = retrieve_selected_concepts()
@@ -192,28 +214,46 @@ if __name__ == "__main__":
     experiment_name_split = experiment_name.split("_")
     experiment_name = experiment_name_split[0]
     if len(experiment_name_split)>1:
-        suffix = "_".join(experiment_name_split[1:])
+            suffix = "_"+"_".join(experiment_name_split[1:])
     else:
         suffix = ""
+    
+    existing_weights = ''
+    if suffix == '_model_robustness':
+        exisitng_weights = 'vgg16_model_robustness.pt'
+    elif suffix == '_model_responsiveness':
+        existing_weights = 'vgg16_model_responsiveness.pt'
     
     if experiment_name == "xor":
         train_dl, valid_dl = generate_data_loaders_xor()
         n_concepts = 2
         n_tasks = 2
-
     elif experiment_name == "cub":
         train_dl, valid_dl = generate_data_loaders_cub(suffix)
         n_concepts = 112
         n_tasks = 200
-
     elif experiment_name == "mnist":
         train_dl, valid_dl = generate_data_loaders_mnist(suffix)
         n_concepts = 10 + 10 + 1
         n_tasks = 10
-    
     else:
         print("{} is not a valid experiment name".format(experiment_name))
 
+    if args.sample_train < 1.0:
+        train_dataset = train_dl.dataset
+        train_size = round(len(train_dataset)*args.sample_train)
+        train_subset = random.sample(range(0,len(train_dataset)),train_size)
+        train_dataset = torch.utils.data.Subset(train_dataset, train_subset)
+        train_dl = torch.utils.data.DataLoader(train_dataset,batch_size=64, shuffle=True, 
+                                               drop_last=True, num_workers=args.num_workers)
+        
+    if args.sample_valid < 1.0:
+        valid_dataset = valid_dl.dataset
+        valid_size = round(len(valid_dataset)*args.sample_valid)
+        valid_subset = random.sample(range(0,len(valid_dataset)),valid_size)
+        valid_dataset = torch.utils.data.Subset(valid_dataset, valid_subset)
+        valid_dl = torch.utils.data.DataLoader(valid_dataset,batch_size=64, shuffle=False, 
+                                               drop_last=False, num_workers=args.num_workers)
 
     if experiment_name == "xor":
         extractor_arch = c_extractor_arch
@@ -222,14 +262,7 @@ if __name__ == "__main__":
     elif experiment_name == 'mnist':
         extractor_arch = vgg16
         
-    existing_weights = ''
-    if suffix == '_model_robustness':
-        exisitng_weights = 'vgg16_robustness.pt'
-    elif suffix == '_model_responsiveness':
-        existing_weights = 'vgg16_responsiveness.pt'
         
-    existing_weights = 'vgg16.pt'
-
     cem_model = ConceptEmbeddingModel(
       n_concepts=n_concepts, # Number of training-time concepts
       n_tasks=n_tasks, # Number of output labels
@@ -239,7 +272,7 @@ if __name__ == "__main__":
       optimizer="adam",
       c_extractor_arch=extractor_arch, # Replace this appropriately
       training_intervention_prob=0.25, # RandInt probability
-      experiment_name=experiment_name, 
+      experiment_name=experiment_name+suffix, 
       seed=seed, 
       existing_weights = existing_weights,
     )

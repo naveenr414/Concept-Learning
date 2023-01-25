@@ -15,6 +15,7 @@ import glob
 import tensorflow as tf
 from src.models import *
 from src.util import *
+import keras
 
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
@@ -117,6 +118,9 @@ def create_concept2vec(dataset,suffix,seed=-1,
     
     destination_folder = "results/concept2vec/{}/{}".format(dataset.experiment_name+suffix,seed)
     
+    np.random.seed(seed)
+    keras.utils.set_random_seed(seed)
+    
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
         
@@ -161,7 +165,7 @@ def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
     Returns:
         concept_vector: Numpy vector representing the concept vector for the attribute
     """
-    
+        
     all_attributes = dataset.get_attributes()
     if attribute_name not in all_attributes:
         raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
@@ -291,7 +295,7 @@ def load_activations_model(experiment_name,max_examples,model_name,sess):
     return act_generator
     
 def get_activations_dictionary(attribute_list,sess,model_name="VGG16",
-                               experiment_name="unfiled",max_examples=500,bottleneck="block4_conv1"):
+                               experiment_name="unfiled",max_examples=500,bottleneck="block4_conv1",delete_activations=True):
     """From a list of concepts or attributes, generate their representation in some model
         such as GoogleNet, at some bottleneck layer
         
@@ -307,7 +311,8 @@ def get_activations_dictionary(attribute_list,sess,model_name="VGG16",
             bottleneck
     """
     
-    delete_previous_activations(bottleneck,attribute_list)
+    if delete_activations:
+        delete_previous_activations(bottleneck,attribute_list)
     act_generator = load_activations_model(experiment_name,max_examples,model_name,sess)
             
     acts = {}
