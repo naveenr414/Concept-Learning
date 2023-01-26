@@ -21,7 +21,7 @@ def stability_metric(hierarchy_method,embedding_method,dataset,attributes,random
         random_seeds: List of numbers representing the random seed for the embeddings
     
     Returns:
-        Float, representing the average pairwise distance between hierarchies
+        Float, representing the average pairwise distance between hierarchies, and the standard deviation
     """
     
     all_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
@@ -31,9 +31,9 @@ def stability_metric(hierarchy_method,embedding_method,dataset,attributes,random
         distance = h1.distance(h2)
         distance_list.append(distance)
         
-    return np.mean(distance_list)
+    return np.mean(distance_list), np.std(distance_list)
 
-def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,suffix):
+def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,suffix,baseline_hierarchies=None):
     """Compare hierarchies by the same seed, with different dataset suffixes
         Use cases include comparing mnist vs. mnist_image_robustness, using pairwise 
         
@@ -47,22 +47,23 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
         suffix: Qualifier for which dataset subtype we're looking at, such as _image_robustness
         
     Returns: 
-        Float, representing average paired distance between hierarchies
+        Float, representing average paired distance between hierarchies, and the standard deviation
     """
     
     if suffix not in ["","_image_robustness","_image_responsiveness","_model_robustness","_model_responsiveness"]:
         raise Exception("{} suffix not supported".format(suffix))
-    
-    baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
+        
+    if baseline_hierarchies == None:
+        baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
     robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,suffix,attributes,seed) for seed in random_seeds]
-    
+        
     distance_list = []
     for h1,h2 in zip(baseline_hierarchies,robust_hierarchies):
         distance_list.append(h1.distance(h2))
-        
-    return np.mean(distance_list)
+                
+    return np.mean(distance_list), np.std(distance_list)
     
-def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the image robustness for  metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
@@ -78,9 +79,10 @@ def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes
     """
     
     return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_image_robustness")
+                                         embedding_method,dataset,attributes,random_seeds,"_image_robustness",
+                                        baseline_hierarchies=baseline_hierarchies)
     
-def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the image responsiveness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
@@ -96,9 +98,10 @@ def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attrib
     """
 
     return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_image_responsiveness")
+                                         embedding_method,dataset,attributes,random_seeds,"_image_responsiveness",
+                                        baseline_hierarchies=baseline_hierarchies)
 
-def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the model robustness for metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
@@ -114,10 +117,11 @@ def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes
     """
     
     return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_model_robustness")
+                                         embedding_method,dataset,attributes,random_seeds,"_model_robustness",
+                                        baseline_hierarchies=baseline_hierarchies)
 
 
-def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds):
+def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the model responsiveness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
@@ -133,7 +137,8 @@ def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attrib
     """
 
     return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_model_responsiveness")
+                                         embedding_method,dataset,attributes,random_seeds,"_model_responsiveness",
+                                        baseline_hierarchies=baseline_hierarchies)
 
 
 def reset_dataset(dataset,seed,max_images):
@@ -183,12 +188,7 @@ def find_similar_concepts(concept,dataset,activations,num_similar_concepts,seed,
     image_dir = "./dataset/images"
         
     concepts = dataset.get_attributes()
-    
-    start = time.time()
-    
-        
-    print("Took {} time to get activations".format(time.time()-start))
-        
+                
     our_vectors = activations[concept]
     
     all_distance_pairs = []
@@ -228,7 +228,7 @@ def rank_distance_concepts(embedding_method,dataset,concept,co_occuring_concepts
     metric_concept_pairs = sorted(metric_concept_pairs, key=lambda k: k[1])
     return [i[0] for i in metric_concept_pairs]
 
-def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,model="VGG16"):
+def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,model="VGG16",baseline_hierarchies=None):
     """Compute the truthfulness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
@@ -240,43 +240,66 @@ def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,ran
         random_seeds: List of numbers representing the random seed for the embeddings
 
     Returns:
-        Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1 
+        Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
     """
-    
-    random.seed(42)
-    
-    n_concepts = len(attributes)//5
-    compare_concepts = len(attributes)//5
+        
+    n_concepts = 5
+    compare_concepts = 3
     max_images = 25
     
-    selected_concepts = random.sample(attributes,k=n_concepts)
     
     avg_truthfulness = []
     
-    for seed in random_seeds:
-        print("Resetting dataset and downloading activations")
-        
-        start = time.time()
-        
-        reset_dataset(dataset,seed,100)
-        with tf.compat.v1.Session() as sess:
-            activation_generator = load_activations_model(dataset.experiment_name,max_images,model,sess)
-            activations = get_activations_dictionary(dataset.get_attributes(),
-                                                     sess,
-                                                     model_name=model,
-                                                     experiment_name=dataset.experiment_name,
-                                                     max_examples=max_images)
-        print("Finished resetting dataset, took {} time".format(time.time()-start))     
-        
+    reset_dataset(dataset,random_seeds[0],100)
+
+    with tf.compat.v1.Session() as sess:
+        activations = get_activations_dictionary(dataset.get_attributes(),
+                                                 sess,
+                                                 model_name=model,
+                                                 experiment_name=dataset.experiment_name,
+                                                 max_examples=max_images)
             
+    for seed in random_seeds:  
+        random.seed(seed)
+        np.random.seed(seed)
+
+        selected_concepts = random.sample(attributes,k=n_concepts)
+        
+        temp_truthfulness = []
+        
         for concept in selected_concepts:
-            start = time.time()
             co_occuring_concepts = find_similar_concepts(concept,dataset,activations,compare_concepts,seed)                        
             co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
                                                                     co_occuring_concepts,seed)
             
-            avg_truthfulness.append(stats.kendalltau(co_occuring_concepts,
+            temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
                                                      co_occuring_concepts_hierarchy).correlation)
+            
+        avg_truthfulness.append(np.mean(temp_truthfulness))
+            
         
-    return np.mean(avg_truthfulness)
+    return np.mean(avg_truthfulness), np.std(avg_truthfulness)
+
+def compute_all_metrics(hierarchy_method,embedding_method,dataset,attributes,random_seeds,model="VGG16"):
+    metrics = [stability_metric,robustness_image_metric,
+               responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric,
+              truthfulness_metric]
+    metric_names = ['Stability', 'Image Robustness', 
+                'Image Responsiveness','Model Robustness','Model Responsiveness',
+                   'Truthfulness']
         
+    baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
+    
+    results = {}
+    
+    for metric,name in zip(metrics,metric_names):
+        score = metric(hierarchy_creation_method,
+                        load_label_vectors_simple,
+                        dataset,
+                        attributes,
+                        seeds, 
+                        baseline_hierarchies=baseline_hierarchies)
+        print("{}: {}".format(name, score))
+        results[name] = score
+        
+    return results

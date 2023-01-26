@@ -16,6 +16,7 @@ import tensorflow as tf
 from src.models import *
 from src.util import *
 import keras
+import time
 
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
@@ -311,17 +312,23 @@ def get_activations_dictionary(attribute_list,sess,model_name="VGG16",
             bottleneck
     """
     
+    start = time.time()
+    
     if delete_activations:
         delete_previous_activations(bottleneck,attribute_list)
+
+    start = time.time()    
     act_generator = load_activations_model(experiment_name,max_examples,model_name,sess)
-            
+        
     acts = {}
     for i in attribute_list:
+        start = time.time()
         examples = act_generator.get_examples_for_concept(i)
         activation_examples = act_generator.model.run_examples(examples, bottleneck)
         acts[i] = activation_examples
         shape = acts[i].shape
         acts[i] = acts[i].reshape((shape[0],shape[1]*shape[2]*shape[3]))
+        
         
     return acts
 
@@ -451,6 +458,18 @@ def load_cem_vectors_simple(attribute,dataset,suffix,seed=-1):
     return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
 
 def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
+    """Simplified call to create vector using a SkipGram that is standardized across embeddings
+    
+    Arguments:
+        attribute: Which concept we're looking to get vectors for, as a string
+        dataset: Object from the dataset class
+        suffix: String; which specific instance of the dataset are we testing out 
+    
+    Returns: 
+        Numpy array of label-based vectors
+    """
+
+    
     dataset_location = "results/concept2vec"
     experiment_name = dataset.experiment_name+suffix
     
@@ -469,7 +488,85 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     
     vector = all_vectors[attribute_index,:]
     return vector.reshape((1,len(vector)))
+
+def create_model_representation_vectors_simple(attribute,dataset,suffix,seed=-1):
+    """Develop a concept vector that's simply based on the model representation
     
+    Arguments:
+        attribute: Which concept we're looking to get vectors for, as a string
+        dataset: Object from the dataset class
+        suffix: String; which specific instance of the dataset are we testing out 
+    
+    Returns: 
+        Numpy array of label-based vectors
+    """
+
+    max_images = 25
+    model = "VGG16"
+    
+    with tf.compat.v1.Session() as sess:
+        activation_generator = load_activations_model(dataset.experiment_name,max_images,model,sess)
+        activations = get_activations_dictionary([attribute],
+                                                 sess,
+                                                 model_name=model,
+                                                 experiment_name=dataset.experiment_name,
+                                                 max_examples=max_images)
+    
+    return activations[attribute]
+    
+    
+def combine_embeddings_average(f_one,f_two):
+    """Given two embedding functions, embedding_one and embedding_two, return a function that returns the 
+        average embedding between the two functions
+        
+    Arguments:
+        f_one: Function such as load_label_vectors_simple
+        f_two: Function such as load_label_vectors_simple
+        
+    Returns: A function, similar to load_label_vectors_simple
+    """
+    
+    def get_average_embedding(attribute,dataset,suffix,seed=-1):
+        embedding_one = f_one(attribute,dataset,suffix,seed=seed)
+        embedding_two = f_two(attribute,dataset,suffix,seed=seed)
+        
+        min_size = min(embedding_one.shape[1],embedding_two.shape[1])
+        
+        return np.mean(np.concatenate([embedding_one[:,:min_size],embedding_two[:,:min_size]]),axis=0).reshape((1,min_size))
+    
+    return get_average_embedding
+    
+def combine_embeddings_concatenate(f_one,f_two):
+    """Given two embedding functions, embedding_one and embedding_two, return a function that returns the 
+        concatenated embedding between the two functions
+        
+    Arguments:
+        f_one: Function such as load_label_vectors_simple
+        f_two: Function such as load_label_vectors_simple
+        
+    Returns: A function, similar to load_label_vectors_simple
+    """
+    
+    def concatenate_per_row(A, B):
+        """Concatenate every row in A to every row in B
+        Taken from https://stackoverflow.com/questions/41589680/concatenation-of-every-row-combination-of-two-numpy-arrays
+        """
+        
+        m1,n1 = A.shape
+        m2,n2 = B.shape
+
+        out = np.zeros((m1,m2,n1+n2),dtype=A.dtype)
+        out[:,:,:n1] = A[:,None,:]
+        out[:,:,n1:] = B
+        return out.reshape(m1*m2,-1)
+
+    def get_average_embedding(attribute,dataset,suffix,seed=-1):
+        embedding_one = f_one(attribute,dataset,suffix,seed=seed)
+        embedding_two = f_two(attribute,dataset,suffix,seed=seed)
+        
+        return concatenate_per_row(embedding_one,embedding_two)
+    
+    return get_average_embedding
     
     
 if __name__ == "__main__":
