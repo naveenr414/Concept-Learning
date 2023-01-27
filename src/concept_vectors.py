@@ -489,11 +489,14 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     vector = all_vectors[attribute_index,:]
     return vector.reshape((1,len(vector)))
 
-def create_model_representation_vectors_simple(attribute,dataset,suffix,seed=-1):
+def create_model_representation_vectors_simple(attributes,dataset,suffix,seed=-1):
     """Develop a concept vector that's simply based on the model representation
     
     Arguments:
-        attribute: Which concept we're looking to get vectors for, as a string
+        attributes: A list of attributes 
+            NOTE THIS IS DIFFERENT FROM OTHER CONCEPT VECTORS
+            The reason for this difference is time; it's faster to generate all the attributes up front due to the 
+            cost of creating the activation generator
         dataset: Object from the dataset class
         suffix: String; which specific instance of the dataset are we testing out 
     
@@ -504,15 +507,20 @@ def create_model_representation_vectors_simple(attribute,dataset,suffix,seed=-1)
     max_images = 25
     model = "VGG16"
     
+    if suffix == "_model_robustness":
+        model = "VGG16Robustness"
+    elif suffix == "_model_responsiveness":
+        model = "VGG16Responsiveness"
+    
     with tf.compat.v1.Session() as sess:
-        activation_generator = load_activations_model(dataset.experiment_name,max_images,model,sess)
-        activations = get_activations_dictionary([attribute],
+        activation_generator = load_activations_model(dataset.experiment_name+suffix,max_images,model,sess)
+        activations = get_activations_dictionary(attributes,
                                                  sess,
                                                  model_name=model,
                                                  experiment_name=dataset.experiment_name,
                                                  max_examples=max_images)
     
-    return activations[attribute]
+    return activations
     
     
 def combine_embeddings_average(f_one,f_two):

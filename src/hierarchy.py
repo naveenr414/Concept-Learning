@@ -299,7 +299,7 @@ def create_hierarchy_thresholding(data,metric='euclidean'):
         
     return return_matrix
 
-def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed):
+def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed,bulk_attributes=False):
     """Create a hierarchy from a set of embeddings and a dataset
     Do this by first creating a distance matrix (pdist-style), then feeding it into hierarchy_method
     
@@ -311,6 +311,7 @@ def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attribute
         suffix: String, which specific instance of the dataset we're using 
         attributes: List of attributes we want to create embeddings for
         random_seed: Number representing the random seed for the embeddings
+        bulk_attributes: Compute all attributes at once? Used only for the models function
         
     Returns:
         Hierarchy from the Hierarchy class
@@ -319,6 +320,10 @@ def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attribute
     distance_matrix = []
     
     embeddings_by_attribute = {}
+    
+    if bulk_attributes:
+        embeddings_by_attribute = embedding_method(attributes,dataset,suffix,seed=random_seed)    
+    
     for attribute in attributes:
         embeddings = embedding_method(attribute,dataset,suffix,seed=random_seed)
         embeddings_by_attribute[attribute] = embeddings
