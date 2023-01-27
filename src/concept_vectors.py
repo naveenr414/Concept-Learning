@@ -410,6 +410,43 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
         mytcav.params = mytcav.get_params()
 
         mytcav.run(run_parallel=False)
+        
+def create_model_vectors(attributes,dataset,suffix,seed=-1):
+    """Develop concept vectors based on a model representation
+    
+    Arguments:
+        attributes: List of attributes to create concept vectors for
+        dataset: Object from the dataset class
+        suffix: String representing which specific instance of the dataset we're testing
+        seed: Random number seed
+        
+    Returns: Nothing
+    
+    Side Effects: Saves concpet vectors to results/model_vectors/seed/attribute.npy"""
+    
+    
+    max_images = 25
+    model = "VGG16"
+    
+    if suffix == "_model_robustness":
+        model = "VGG16Robustness"
+    elif suffix == "_model_responsiveness":
+        model = "VGG16Responsiveness"
+    
+    with tf.compat.v1.Session() as sess:
+        activation_generator = load_activations_model(dataset.experiment_name+suffix,max_images,model,sess)
+        activations = get_activations_dictionary(attributes,
+                                                 sess,
+                                                 model_name=model,
+                                                 experiment_name=dataset.experiment_name,
+                                                 max_examples=max_images)
+    
+    if not os.path.exists("results/model_vectors/{}/{}".format(dataset.experiment_name+suffix,seed)):
+        os.makedirs("results/model_vectors/{}/{}".format(dataset.experiment_name+suffix,seed))
+        
+    for attribute in activations:
+        save_file = "results/model_vectors/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute)
+        np.save(open(save_file,"wb"),activations[attribute])
 
 def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings
@@ -489,14 +526,11 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     vector = all_vectors[attribute_index,:]
     return vector.reshape((1,len(vector)))
 
-def create_model_representation_vectors_simple(attributes,dataset,suffix,seed=-1):
+def load_model_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Develop a concept vector that's simply based on the model representation
     
     Arguments:
-        attributes: A list of attributes 
-            NOTE THIS IS DIFFERENT FROM OTHER CONCEPT VECTORS
-            The reason for this difference is time; it's faster to generate all the attributes up front due to the 
-            cost of creating the activation generator
+        attribute: A single attribute 
         dataset: Object from the dataset class
         suffix: String; which specific instance of the dataset are we testing out 
     
@@ -504,23 +538,7 @@ def create_model_representation_vectors_simple(attributes,dataset,suffix,seed=-1
         Numpy array of label-based vectors
     """
 
-    max_images = 25
-    model = "VGG16"
-    
-    if suffix == "_model_robustness":
-        model = "VGG16Robustness"
-    elif suffix == "_model_responsiveness":
-        model = "VGG16Responsiveness"
-    
-    with tf.compat.v1.Session() as sess:
-        activation_generator = load_activations_model(dataset.experiment_name+suffix,max_images,model,sess)
-        activations = get_activations_dictionary(attributes,
-                                                 sess,
-                                                 model_name=model,
-                                                 experiment_name=dataset.experiment_name,
-                                                 max_examples=max_images)
-    
-    return activations
+    return np.load("results/model_vectors/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute))
     
     
 def combine_embeddings_average(f_one,f_two):
@@ -614,5 +632,10 @@ if __name__ == "__main__":
         create_tcav_dataset(args.class_name,MNIST_Dataset(),
                             args.num_random_exp,args.images_per_folder,
                             seed=args.seed,suffix=suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
+    elif 'model_mnist' in args.algorithm:
+        suffix = args.algorithm.replace("model_mnist","")
+        dataset = MNIST_Dataset()
+        attributes = dataset.get_attributes()
+        create_model_vectors(attributes,dataset,suffix,args.seed)
     else:
         raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
