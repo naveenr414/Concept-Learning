@@ -432,6 +432,10 @@ def create_model_vectors(attributes,dataset,suffix,seed=-1):
         model = "VGG16Robustness"
     elif suffix == "_model_responsiveness":
         model = "VGG16Responsiveness"
+        
+    for attribute in attributes:
+        create_folder_from_attribute(attribute_name,
+                                     dataset.get_images_with_attribute,num_images=max_images,suffix=suffix,seed=seed)
     
     with tf.compat.v1.Session() as sess:
         activation_generator = load_activations_model(dataset.experiment_name+suffix,max_images,model,sess)
