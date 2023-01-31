@@ -344,6 +344,8 @@ if __name__ == "__main__":
         embedding_method = combine_embeddings_concatenate(load_label_vectors_simple,load_tcav_vectors_simple)
     elif algorithm == 'model':
         embedding_method = load_model_vectors_simple
+    elif algorithm == 'tcav_dr':
+        embedding_method = load_tcav_dr_vectors_simple
     
     results = compute_all_metrics(hierarchy_creation_method,
                                     embedding_method,

@@ -17,6 +17,7 @@ from src.models import *
 from src.util import *
 import keras
 import time
+from sklearn.decomposition import PCA
 
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
@@ -434,7 +435,7 @@ def create_model_vectors(attributes,dataset,suffix,seed=-1):
         model = "VGG16Responsiveness"
         
     for attribute in attributes:
-        create_folder_from_attribute(attribute_name,
+        create_folder_from_attribute(attribute,
                                      dataset.get_images_with_attribute,num_images=max_images,suffix=suffix,seed=seed)
     
     with tf.compat.v1.Session() as sess:
@@ -452,6 +453,49 @@ def create_model_vectors(attributes,dataset,suffix,seed=-1):
         save_file = "results/model_vectors/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute)
         np.save(open(save_file,"wb"),activations[attribute])
 
+def create_dimensionality_reduced_TCAV(dataset,suffix,seed,k=8):
+    """Create a version of the TCAV vectors that have PCA dimensionality reduce them to k dimensions
+    
+    Arguments:
+        dataset: An object from the dataset class, for which to create vectors
+        suffix: String for a specific version of the dataset
+        seed: Number that represents a random seed
+        k: Size of the dimensionality reduced vectors
+        
+    Returns: Nothing
+    
+    Side Effects: Stores the vectors at tcav_dim_reduce folder
+    """
+    
+    folder = "results/tcav_dim_reduce/{}/{}".format(dataset.experiment_name+suffix,seed)
+    attributes = dataset.get_attributes()
+    
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+
+    index_by_attribute = [0]
+
+    all_vectors = None
+
+    for attribute in attributes:
+        vectors = load_tcav_vectors_simple(attribute,dataset,suffix,seed=seed)
+        index_by_attribute.append(len(vectors) + index_by_attribute[-1])
+
+        if type(all_vectors) == type(None):
+            all_vectors = vectors
+        else:
+            all_vectors = np.concatenate([all_vectors,vectors])
+    X_embedded = PCA(n_components=8).fit_transform(all_vectors)
+    for i in range(len(index_by_attribute)-1):
+        start = index_by_attribute[i]
+        end = index_by_attribute[i+1]
+        attribute = attributes[i]
+        vectors = X_embedded[start:end,:]
+
+        file_name = folder + "/{}.npy".format(attribute)
+
+        np.save(open(file_name,"wb"),vectors)
+
 def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to load_tcav_vectors that is standardized across embeddings
     
@@ -461,7 +505,7 @@ def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
         suffix: Strnig representing which specific instance of the dataset we're testing 
     
     Returns: 
-        Numpy array of TCAV vectors
+       Numpy array of TCAV vectors
     """
         
     return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed)[0]
@@ -530,6 +574,12 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     vector = all_vectors[attribute_index,:]
     return vector.reshape((1,len(vector)))
 
+def load_vector_from_folder(folder_name):
+    def load_vectors_simple(attribute,dataset,suffix,seed=-1):
+        return np.load("results/{}/{}/{}/{}.npy".format(folder_name,dataset.experiment_name+suffix,seed,attribute))
+
+    return load_vectors_simple
+    
 def load_model_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Develop a concept vector that's simply based on the model representation
     
@@ -542,8 +592,22 @@ def load_model_vectors_simple(attribute,dataset,suffix,seed=-1):
         Numpy array of label-based vectors
     """
 
-    return np.load("results/model_vectors/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute))
+    return load_vector_from_folder("model_vectors")(attribute,dataset,suffix,seed=seed)
     
+def load_tcav_dr_vectors_simple(attribute,dataset,suffix,seed=-1):
+    """Develop a concept vectors that's a dimensionality reduced version of TCAV
+    
+    Arguments:
+        attribute: A single attribute 
+        dataset: Object from the dataset class
+        suffix: String; which specific instance of the dataset are we testing out 
+    
+    Returns: 
+        Numpy array of dimensionality reduced TCAV vectors
+    """
+        
+    return load_vector_from_folder("tcav_dim_reduce")(attribute,dataset,suffix,seed=seed)
+
     
 def combine_embeddings_average(f_one,f_two):
     """Given two embedding functions, embedding_one and embedding_two, return a function that returns the 
