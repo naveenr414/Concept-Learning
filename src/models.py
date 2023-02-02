@@ -6,8 +6,9 @@ from keras.utils import np_utils
 from keras.utils.data_utils import get_file
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import skipgrams
+import tensorflow as tf
 
-def create_skipgram_architecture(embedding_dimension,vocab_size):
+def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embedding=None):
     """Create a skipgram architecture in keras, given an embedding dimension and a vocab size
     Do this by first turning a (target,context) pair into embeddings, taking the dot, then 
         enforcing that they're close to 1
@@ -21,7 +22,12 @@ def create_skipgram_architecture(embedding_dimension,vocab_size):
     
     # Target
     w_inputs = Input(shape=(1, ), dtype='int32')
-    w = Embedding(vocab_size, embedding_dimension)(w_inputs)
+    
+    if type(initial_embedding) != type(None):
+        w = Embedding(vocab_size, embedding_dimension, 
+                     embeddings_initializer=tf.keras.initializers.Constant(initial_embedding))(w_inputs)
+    else: 
+        w = Embedding(vocab_size, embedding_dimension)(w_inputs)
 
     # Context 
     c_inputs = Input(shape=(1, ), dtype='int32')

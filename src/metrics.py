@@ -9,11 +9,32 @@ from scipy.spatial.distance import cdist
 import scipy
 import time
 
-def stability_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
+def get_top_k_pairs(embedding,k=3):
+    pairs = []
+    
+    for i,row in enumerate(embedding):
+        top_k = np.argpartition(row, k+1)[:k+1]
+        top_k = [j for j in top_k if j != i]
+        
+        assert len(top_k) == k
+        
+        pairs += [(i,j) for j in top_k]
+
+    return pairs 
+
+def embedding_distance(h1,h2,k=3):
+    pairs_1 = get_top_k_pairs(h1,k=k)
+    pairs_2 = get_top_k_pairs(h2,k=k)
+    
+    intersection = set(pairs_1).intersection(set(pairs_2))
+    
+    return 1 - len(intersection)/(k*len(h1))
+    
+
+def stability_metric(embedding_method,dataset,attributes,random_seeds):
     """Compute the stability metric for a set of random seeds, given a hierarchy+embedding method
 
     Arguments:
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -24,22 +45,21 @@ def stability_metric(hierarchy_method,embedding_method,dataset,attributes,random
         Float, representing the average pairwise distance between hierarchies, and the standard deviation
     """
 
-    if baseline_hierarchies == None:
-        baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
+    baseline_embeddings = [flat_distance_to_square(get_concept_distances
+                                                   (embedding_method,dataset,"",attributes,seed)) for seed in random_seeds]
 
     distance_list = []
-    for h1,h2 in itertools.combinations(baseline_hierarchies,r=2):
-        distance = h1.distance(h2)
+    for h1,h2 in itertools.combinations(baseline_embeddings,r=2):
+        distance = embedding_distance(h1,h2)
         distance_list.append(distance)
         
     return np.mean(distance_list), np.std(distance_list)
 
-def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attributes,random_seeds,suffix,baseline_hierarchies=None):
+def compare_same_images_by_suffix(embedding_method,dataset,attributes,random_seeds,suffix,baseline_hierarchies=None):
     """Compare hierarchies by the same seed, with different dataset suffixes
         Use cases include comparing mnist vs. mnist_image_robustness, using pairwise 
         
     Arguments:
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -54,21 +74,20 @@ def compare_same_images_by_suffix(hierarchy_method,embedding_method,dataset,attr
     if suffix not in ["","_image_robustness","_image_responsiveness","_model_robustness","_model_responsiveness"]:
         raise Exception("{} suffix not supported".format(suffix))
         
-    if baseline_hierarchies == None:
-        baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
-    robust_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,suffix,attributes,seed) for seed in random_seeds]
+    baseline_embeddings = [flat_distance_to_square(get_concept_distances
+                                                   (embedding_method,dataset,"",attributes,seed)) for seed in random_seeds]
+    robust_hierarchies = [flat_distance_to_square(get_concept_distances(embedding_method,dataset,suffix,attributes,seed)) for seed in random_seeds]
         
     distance_list = []
-    for h1,h2 in zip(baseline_hierarchies,robust_hierarchies):
-        distance_list.append(h1.distance(h2))
+    for h1,h2 in zip(baseline_embeddings,robust_hierarchies):
+        distance_list.append(embedding_distance(h1,h2))
                 
     return np.mean(distance_list), np.std(distance_list)
     
-def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
+def robustness_image_metric(embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the image robustness for  metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -79,15 +98,14 @@ def robustness_image_metric(hierarchy_method,embedding_method,dataset,attributes
         Float, representing the average distance between each pair of images when perturbed, comparing only like-seeds
     """
     
-    return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_image_robustness",
+    return compare_same_images_by_suffix(embedding_method,
+                                         dataset,attributes,random_seeds,"_image_robustness",
                                         baseline_hierarchies=baseline_hierarchies)
     
-def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
+def responsiveness_image_metric(embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the image responsiveness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -98,15 +116,14 @@ def responsiveness_image_metric(hierarchy_method,embedding_method,dataset,attrib
          Float, representing the average distance between each pair of images when significantly altered, comparing only like-seeds
     """
 
-    return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_image_responsiveness",
+    return compare_same_images_by_suffix(embedding_method,
+                                         dataset,attributes,random_seeds,"_image_responsiveness",
                                         baseline_hierarchies=baseline_hierarchies)
 
-def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
+def robustness_model_metric(embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the model robustness for metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -117,16 +134,14 @@ def robustness_model_metric(hierarchy_method,embedding_method,dataset,attributes
         Float, representing the average distance between each pair of images when perturbed, comparing only like-seeds
     """
     
-    return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_model_robustness",
+    return compare_same_images_by_suffix(embedding_method,dataset,attributes,random_seeds,"_model_robustness",
                                         baseline_hierarchies=baseline_hierarchies)
 
 
-def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
+def responsiveness_model_metric(embedding_method,dataset,attributes,random_seeds,baseline_hierarchies=None):
     """Compute the model responsiveness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
@@ -137,8 +152,8 @@ def responsiveness_model_metric(hierarchy_method,embedding_method,dataset,attrib
          Float, representing the average distance between each pair of images when significantly altered, comparing only like-seeds
     """
 
-    return compare_same_images_by_suffix(hierarchy_method,
-                                         embedding_method,dataset,attributes,random_seeds,"_model_responsiveness",
+    return compare_same_images_by_suffix(embedding_method,
+                                         dataset,attributes,random_seeds,"_model_responsiveness",
                                         baseline_hierarchies=baseline_hierarchies)
 
 
@@ -229,11 +244,10 @@ def rank_distance_concepts(embedding_method,dataset,concept,co_occuring_concepts
     metric_concept_pairs = sorted(metric_concept_pairs, key=lambda k: k[1])
     return [i[0] for i in metric_concept_pairs]
 
-def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,random_seeds,model="VGG16",baseline_hierarchies=None):
+def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="VGG16",baseline_hierarchies=None):
     """Compute the truthfulness metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        hierarchy_method: Function such as create_ward_hierarchy that creates a dendrogram
         embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: Object from the dataset class
@@ -281,25 +295,21 @@ def truthfulness_metric(hierarchy_method,embedding_method,dataset,attributes,ran
         
     return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
-def compute_all_metrics(hierarchy_method,embedding_method,dataset,attributes,random_seeds,model="VGG16"):
+def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16"):
     metrics = [stability_metric,robustness_image_metric,
                responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric,
               truthfulness_metric]
     metric_names = ['Stability', 'Image Robustness', 
                 'Image Responsiveness','Model Robustness','Model Responsiveness',
                    'Truthfulness']
-        
-    baseline_hierarchies = [create_hierarchy(hierarchy_method,embedding_method,dataset,"",attributes,seed) for seed in random_seeds]
-    
+            
     results = {}
     
     for metric,name in zip(metrics,metric_names):
-        score = metric(hierarchy_method,
-                        embedding_method,
+        score = metric(embedding_method,
                         dataset,
                         attributes,
-                        random_seeds, 
-                        baseline_hierarchies=baseline_hierarchies)
+                        random_seeds)
         print("{}: {}".format(name, score))
         results[name] = score
         
@@ -315,7 +325,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     seeds = [43,44,45]
-    hierarchy_creation_method = create_linkage_hierarchy
     
     if args.dataset == 'mnist':
         dataset = MNIST_Dataset()
@@ -347,8 +356,7 @@ if __name__ == "__main__":
     elif algorithm == 'tcav_dr':
         embedding_method = load_tcav_dr_vectors_simple
     
-    results = compute_all_metrics(hierarchy_creation_method,
-                                    embedding_method,
+    results = compute_all_metrics(embedding_method,
                                     dataset,
                                     attributes,
                                     seeds)

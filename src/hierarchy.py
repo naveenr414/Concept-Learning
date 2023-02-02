@@ -5,6 +5,7 @@ from scipy.sparse.csgraph import minimum_spanning_tree
 import numpy as np
 from zss import simple_distance, Node
 import sklearn
+from math import ceil
 
 class Split:
     """Class that captures a split in a dendogram. 
@@ -299,6 +300,66 @@ def create_hierarchy_thresholding(data,metric='euclidean'):
         
     return return_matrix
 
+def flat_distance_to_square(distance_matrix):
+    """Convert a flat distance list, which contains the distances from object 1 to objects 1...n, then object 2 to 2...n, etc.
+        to a distance matrix of size nxn
+        
+    Arguments: Numpy array distance_matrix which is a numpy list of size n(n-1)/2
+    
+    Returns: Numpy array of size nxn
+    """
+    
+    n = ceil((2*len(distance_matrix))**.5)
+    new_distances = np.zeros((n,n))
+    
+    current_num = 0
+    
+    for i in range(n):
+        for j in range(i+1,n):            
+            new_distances[i][j] = distance_matrix[current_num]
+            new_distances[j][i] = distance_matrix[current_num]
+           
+            current_num += 1
+            
+    return new_distances
+
+
+def get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed):
+    """Compute a numpy distance matrix between every pair of concepts
+    
+    Arguments:
+        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+            Simply loads embeddings, does not train them from scratch 
+        dataset: Object from the dataset class
+        suffix: String, which specific instance of the dataset we're using 
+        attributes: List of attributes we want to create embeddings for
+        random_seed: Number representing the random seed for the embeddings
+        
+    Returns: Numpy distance matrix
+
+    """
+    
+    distance_matrix = []
+    
+    embeddings_by_attribute = {}
+    
+    for attribute in attributes:
+        embeddings = embedding_method(attribute,dataset,suffix,seed=random_seed)
+        embeddings_by_attribute[attribute] = embeddings
+        
+    for i in range(len(attributes)):
+        for j in range(i+1,len(attributes)):
+            embeddings_i = embeddings_by_attribute[attributes[i]]
+            embeddings_j = embeddings_by_attribute[attributes[j]]
+            
+            all_pairwise_distances = sklearn.metrics.pairwise_distances(embeddings_i,embeddings_j)
+            distance = np.mean(all_pairwise_distances)
+            distance_matrix.append(distance)
+    
+    distance_matrix = np.array(distance_matrix)
+    
+    return distance_matrix
+
 def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed):
     """Create a hierarchy from a set of embeddings and a dataset
     Do this by first creating a distance matrix (pdist-style), then feeding it into hierarchy_method
@@ -316,25 +377,7 @@ def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attribute
         Hierarchy from the Hierarchy class
     """
     
-    distance_matrix = []
-    
-    embeddings_by_attribute = {}
-    
-    
-    for attribute in attributes:
-        embeddings = embedding_method(attribute,dataset,suffix,seed=random_seed)
-        embeddings_by_attribute[attribute] = embeddings
-        
-    for i in range(len(attributes)):
-        for j in range(i+1,len(attributes)):
-            embeddings_i = embeddings_by_attribute[attributes[i]]
-            embeddings_j = embeddings_by_attribute[attributes[j]]
-            
-            all_pairwise_distances = sklearn.metrics.pairwise_distances(embeddings_i,embeddings_j)
-            distance = np.mean(all_pairwise_distances)
-            distance_matrix.append(distance)
-    
-    distance_matrix = np.array(distance_matrix)
+    distance_matrix = get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed)    
     dendrogram = hierarchy_method(distance_matrix)
     h = Hierarchy()
     h.from_array(dendrogram,attributes)

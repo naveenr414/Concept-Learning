@@ -101,7 +101,7 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     return all_concept_vectors, concept_meta_info
 
 def create_concept2vec(dataset,suffix,seed=-1,
-                             embedding_size=32,num_epochs=5,dataset_size=1000):
+                             embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None):
     """Generate concept2vec vectors by training a Skipgram architecture on correlated concepts
     
     Arguments:
@@ -130,7 +130,7 @@ def create_concept2vec(dataset,suffix,seed=-1,
     V = len(attributes)
     all_data = dataset.get_data(seed,suffix)[:dataset_size]
     
-    SkipGram = create_skipgram_architecture(embedding_size,V)
+    SkipGram = create_skipgram_architecture(embedding_size,V,initial_embedding=initial_embedding)
     
     for _ in range(num_epochs):
         X = np.zeros((0,2),dtype=np.int32)
@@ -485,7 +485,7 @@ def create_dimensionality_reduced_TCAV(dataset,suffix,seed,k=8):
             all_vectors = vectors
         else:
             all_vectors = np.concatenate([all_vectors,vectors])
-    X_embedded = PCA(n_components=8).fit_transform(all_vectors)
+    X_embedded = PCA(n_components=k).fit_transform(all_vectors)
     for i in range(len(index_by_attribute)-1):
         start = index_by_attribute[i]
         end = index_by_attribute[i+1]
