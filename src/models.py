@@ -7,6 +7,96 @@ from keras.utils.data_utils import get_file
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import skipgrams
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import glob
+from src.util import *
+
+class Sampling(layers.Layer):
+    """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
+
+    def call(self, inputs):
+        z_mean, z_log_var = inputs
+        batch = tf.shape(z_mean)[0]
+        dim = tf.shape(z_mean)[1]
+        epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
+        return z_mean + tf.exp(0.5 * z_log_var) * epsilon
+
+def create_encoder(channels,latent_dim):
+    """Create the encoder part of a VAE model
+    
+    Arguments:
+        channels: Number of channels in the image; 3 for RGB
+        latent_dim: Size of the latent vector (the middle part of the VAE
+    """
+    
+    encoder_inputs = keras.Input(shape=(28, 28, channels))
+    x = layers.Conv2D(32, 3, activation="relu", strides=2, padding="same")(encoder_inputs)
+    x = layers.Conv2D(64, 3, activation="relu", strides=2, padding="same")(x)
+    x = layers.Flatten()(x)
+    x = layers.Dense(16, activation="relu")(x)
+    z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+    z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+    z = Sampling()([z_mean, z_log_var])
+    return  keras.Model(encoder_inputs, [z_mean, z_log_var, z], name="encoder")
+    
+def create_decoder(channels,latent_dim):
+    """Create the decoder part of a VAE model
+    
+    Arguments:
+        channels: Number of channels in the image; 3 for RGB
+        latent_dim: Size of the latent vector (the middle part of the VAE
+    """
+    
+    latent_inputs = keras.Input(shape=(latent_dim,))
+    x = layers.Dense(7 * 7 * 64, activation="relu")(latent_inputs)
+    x = layers.Reshape((7, 7, 64))(x)
+    x = layers.Conv2DTranspose(64, 3, activation="relu", strides=2, padding="same")(x)
+    x = layers.Conv2DTranspose(32, 3, activation="relu", strides=2, padding="same")(x)
+    decoder_outputs = layers.Conv2DTranspose(channels, 3, activation="sigmoid", padding="same")(x)
+    return keras.Model(latent_inputs, decoder_outputs, name="decoder")
+
+class VAE(keras.Model):
+    def __init__(self, encoder, decoder,**kwargs):
+        super().__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
+        self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
+        self.reconstruction_loss_tracker = keras.metrics.Mean(
+            name="reconstruction_loss"
+        )
+        self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+
+    @property
+    def metrics(self):
+        return [
+            self.total_loss_tracker,
+            self.reconstruction_loss_tracker,
+            self.kl_loss_tracker,
+        ]
+
+    def train_step(self, data):
+        with tf.GradientTape() as tape:
+            z_mean, z_log_var, z = self.encoder(data)
+            reconstruction = self.decoder(z)
+            reconstruction_loss = tf.reduce_mean(
+                tf.reduce_sum(
+                    keras.losses.binary_crossentropy(data, reconstruction), axis=(1,2)
+                )
+            )
+            kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
+            kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
+            total_loss = reconstruction_loss + kl_loss
+        grads = tape.gradient(total_loss, self.trainable_weights)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
+        self.total_loss_tracker.update_state(total_loss)
+        self.reconstruction_loss_tracker.update_state(reconstruction_loss)
+        self.kl_loss_tracker.update_state(kl_loss)
+        return {
+            "loss": self.total_loss_tracker.result(),
+            "reconstruction_loss": self.reconstruction_loss_tracker.result(),
+            "kl_loss": self.kl_loss_tracker.result(),
+        }
 
 def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embedding=None):
     """Create a skipgram architecture in keras, given an embedding dimension and a vocab size
@@ -40,3 +130,27 @@ def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embeddin
     SkipGram.compile(loss='binary_crossentropy', optimizer='adam')
     
     return SkipGram
+
+def train_VAE(dataset, save_location="", latent_dim=2):
+    """Train a VAE model on some dataset, such as MNIST
+    
+    Arguments:
+        dataset: Object from the dataset class, such as MNIST or CUB
+        save_location: String that says where to store the VAE model; if empty it won't be stored
+        latent_dim: Size of the latent dimension for the VAE model
+        
+    Returns: Nothing
+    """
+    
+    all_files = glob.glob(dataset.all_files)
+    images = np.array([file_to_numpy(i) for i in all_files])
+
+    decoder_3 = create_decoder(3,2)
+    encoder_3 = create_encoder(3,2)
+
+    vae = VAE(encoder_3, decoder_3)
+    vae.compile(optimizer=keras.optimizers.Adam())
+    vae.fit(images, epochs=1, batch_size=128)    
+    
+    if save_location != "":
+        vae.save_weights("results/models/{}".format(save_location))

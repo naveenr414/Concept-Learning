@@ -13,24 +13,6 @@ import numpy as np
 import argparse
 import random
 
-def retrieve_selected_concepts():
-    """The CBM and CEM papers use a subset of the main birds concept
-        In particular, they use 112/312 concepts
-        We retrieve the indexes of these concepts; which we precompute and store elsewhere
-        
-        Arguments: None
-        
-        Returns: List of 0-indexed indicies, which represent attributes that are used
-    """
-    
-    attributes_file = "CUB/metadata/attributes.txt"
-    
-    f = open(attributes_file).read().strip().split("\n")
-    indexes = [int(i.split(" ")[0]) for i in f]
-    
-    # Make indexes 0-indexed
-    indexes = [i-1 for i in indexes]
-    return indexes
 
 def save_vgg16_model(suffix):
     model = vgg16(pretrained=True)
@@ -46,6 +28,33 @@ def save_vgg16_model(suffix):
     
     torch.save(model.state_dict(),"vgg16{}.pt".format(suffix))
 
+def save_vgg16_model(suffix):
+    model = vgg16(pretrained=True)
+    
+    for name, param in model.named_parameters():
+        if suffix == "":
+            random_nums = np.ones(param.shape)
+        elif suffix == "_model_robustness":
+            random_nums = np.random.uniform(low=0.95,high=1.05,size=param.shape)
+        elif suffix == "_model_responsiveness":
+            random_nums = np.random.uniform(low=-1,high=1,size=param.shape)
+        param.data *= torch.Tensor(random_nums)
+    
+    torch.save(model.state_dict(),"vgg16{}.pt".format(suffix))
+    
+def save_resnet_model(suffix):
+    model = resnet50(pretrained=True)
+    
+    for name, param in model.named_parameters():
+        if suffix == "":
+            random_nums = np.ones(param.shape)
+        elif suffix == "_model_robustness":
+            random_nums = np.random.uniform(low=0.95,high=1.05,size=param.shape)
+        elif suffix == "_model_responsiveness":
+            random_nums = np.random.uniform(low=-1,high=1,size=param.shape)
+        param.data *= torch.Tensor(random_nums)
+    
+    torch.save(model.state_dict(),"resnet{}.pt".format(suffix))
 
 def c_extractor_arch(output_dim):
     """A feedforward architecture used before concept extraction 
@@ -97,7 +106,7 @@ def generate_data_loaders_cub(suffix):
         train_dl: A PyTorch dataloader with data, output, and concepts
         valid_dl: A PyTorch dataloader with data, output, and concepts
     """
-    cub_location = 'CUB{}'.format(suffix)
+    cub_location = '../../main_code/dataset/CUB{}'.format(suffix)
     train_data_path = cub_location+'/preprocessed/train.pkl'
     valid_data_path = cub_location+'/preprocessed/val.pkl'
     
@@ -148,7 +157,7 @@ def generate_data_loaders_mnist(suffix):
     if suffix in ["_model_robustness","_model_responsiveness"]:
         suffix = ""
     
-    mnist_location = 'colored_mnist{}'.format(suffix)
+    mnist_location = '../../main_code/dataset/colored_mnist{}'.format(suffix)
     train_data_path = mnist_location+'/images/train.pkl'
     valid_data_path = mnist_location+'/images/val.pkl'
     
@@ -164,7 +173,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            '{}/'.format(mnist_location),
+            'colored_mnist'.format(suffix),
             '')
     )
     
@@ -180,7 +189,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            '{}/'.format(mnist_location),
+            'colored_mnist'.format(suffix),
             '')
     )
     
@@ -198,8 +207,8 @@ if __name__ == "__main__":
     parser.add_argument('--seed',type=int,default=42,help='Random seed for training')
     parser.add_argument('--num_workers',type=int,default=8,help='Number of workers')
     parser.add_argument('--sample_train',type=float,default=1.0,help='Fraction of the train dataset to sample')
-    parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')
-
+    parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')    
+    
     args = parser.parse_args()
     experiment_name = args.experiment_name
     num_gpus = args.num_gpus
@@ -209,20 +218,19 @@ if __name__ == "__main__":
     num_workers = args.num_workers
 
     pl.seed_everything(args.seed, workers=True)
-    selected_concepts = retrieve_selected_concepts()
 
     experiment_name_split = experiment_name.split("_")
     experiment_name = experiment_name_split[0]
     if len(experiment_name_split)>1:
-            suffix = "_"+"_".join(experiment_name_split[1:])
+        suffix = "_"+"_".join(experiment_name_split[1:])
     else:
         suffix = ""
     
     existing_weights = ''
     if suffix == '_model_robustness':
-        exisitng_weights = 'vgg16_model_robustness.pt'
+        exisitng_weights = 'resnet_model_robustness.pt'
     elif suffix == '_model_responsiveness':
-        existing_weights = 'vgg16_model_responsiveness.pt'
+        existing_weights = 'resnet_model_responsiveness.pt'
     
     if experiment_name == "xor":
         train_dl, valid_dl = generate_data_loaders_xor()
@@ -258,9 +266,9 @@ if __name__ == "__main__":
     if experiment_name == "xor":
         extractor_arch = c_extractor_arch
     elif experiment_name == "cub":
-        extractor_arch = vgg16
+        extractor_arch = resnet50
     elif experiment_name == 'mnist':
-        extractor_arch = vgg16
+        extractor_arch = resnet50
         
         
     cem_model = ConceptEmbeddingModel(

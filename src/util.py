@@ -5,6 +5,7 @@ from collections import Counter
 from collections import defaultdict
 import random
 import tensorflow as tf
+from PIL import Image
 
 def create_distance_metric(vector_a,vector_b,metric):
     """Find the distance for every pair of vectors in vector_a and vector_b
@@ -446,3 +447,14 @@ def generate_skipgram_dataset(datapoint,all_concepts,num_positive,num_negative):
     np.random.shuffle(whole_dataset)
     
     return whole_dataset[:,:2], whole_dataset[:,-1]
+
+def file_to_numpy(file_name):
+    """Convert an image file to a numpy array
+    
+    Arguments: 
+        file_name: String representing an image file
+
+    Returns: numpy array which represents image, with pixels between 0-1
+    """
+    
+    return np.array(Image.open(file_name)).astype("float32")/255
