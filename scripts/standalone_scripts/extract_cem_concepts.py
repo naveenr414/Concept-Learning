@@ -173,7 +173,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            'colored_mnist'.format(suffix),
+            'colored_mnist{}'.format(suffix),
             '')
     )
     
@@ -189,7 +189,7 @@ def generate_data_loaders_mnist(suffix):
         root_dir=mnist_location,
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
-            'colored_mnist'.format(suffix),
+            'colored_mnist{}'.format(suffix),
             '')
     )
     

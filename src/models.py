@@ -11,6 +11,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import glob
 from src.util import *
+import os
 
 class Sampling(layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
@@ -131,7 +132,7 @@ def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embeddin
     
     return SkipGram
 
-def train_VAE(dataset, save_location="", latent_dim=2):
+def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30):
     """Train a VAE model on some dataset, such as MNIST
     
     Arguments:
@@ -142,15 +143,74 @@ def train_VAE(dataset, save_location="", latent_dim=2):
     Returns: Nothing
     """
     
-    all_files = glob.glob(dataset.all_files)
+    np.random.seed(seed)
+    tf.keras.utils.set_random_seed(seed)
+    
+    all_data = dataset.get_data(seed=seed,suffix=suffix)
+    all_files = ['dataset'+i['img_path'] for i in all_data]
     images = np.array([file_to_numpy(i) for i in all_files])
 
-    decoder_3 = create_decoder(3,2)
-    encoder_3 = create_encoder(3,2)
+    decoder_3 = create_decoder(3,latent_dim)
+    encoder_3 = create_encoder(3,latent_dim)
 
     vae = VAE(encoder_3, decoder_3)
     vae.compile(optimizer=keras.optimizers.Adam())
-    vae.fit(images, epochs=1, batch_size=128)    
+    vae.fit(images, epochs=epochs, batch_size=128)    
     
     if save_location != "":
         vae.save_weights("results/models/{}".format(save_location))
+
+    save_vae(vae,dataset,suffix,seed)
+        
+def save_vae(model,dataset,suffix,seed):
+    all_data = dataset.get_data()
+    random.shuffle(all_data)
+    
+    all_data = all_data[:10000]
+    all_images = [file_to_numpy("dataset/"+i['img_path']) for i in all_data]
+    all_images = np.array(all_images)
+    
+    embeddings = model.encoder.predict(np.array(all_images).astype("float32")/255)[2]    
+
+    average_embedding_by_concept = {}
+    
+    for index, name in enumerate(dataset.get_attributes()):
+        embeddings_with_concept = np.array([embeddings[i] for i in range(len(all_data)) 
+                                            if all_data[i]['attribute_label'][index] == 1])
+        mean_embedding = np.mean(embeddings_with_concept,axis=0)
+        average_embedding_by_concept[name] = np.array([mean_embedding])
+
+    folder_name = "results/vae/{}/{}".format(dataset.experiment_name+suffix,seed)
+        
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+        
+    for concept in average_embedding_by_concept:
+        file_name = "{}/{}.npy".format(folder_name,concept)
+        np.save(open(file_name,"wb"),average_embedding_by_concept[concept])
+
+if __name___ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
+    parser.add_argument('--algorithm',type=str,
+                        help='Which algorithm to use to generate concept vectors')
+    parser.add_argument('--dataset', type=str,
+                        help='Name of the dataset which we generate, such as mnist')
+    parser.add_argument('--suffix', type=str,
+                        help='Specific subclass of dataset we\'re using')
+    parser.add_argument('--seed',type=int, default=42,
+                        help='Random seed used in tcav experiment')
+
+    args = parser.parse_args()
+    
+    if args.dataset.lower() == 'mnist':
+        dataset = MNIST_Dataset()
+    elif args.dataset.lower() == 'cub':
+        dataset = CUB_Dataset()
+    else:
+        raise Exception("{} not implemented".format(args.dataset))
+    
+    seed = args.seed
+    suffix = args.suffix
+    
+    if args.algorithm == 'vae':
+        train_VAE(dataset,suffix,seed)
