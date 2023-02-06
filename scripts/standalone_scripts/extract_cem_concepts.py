@@ -207,7 +207,9 @@ if __name__ == "__main__":
     parser.add_argument('--seed',type=int,default=42,help='Random seed for training')
     parser.add_argument('--num_workers',type=int,default=8,help='Number of workers')
     parser.add_argument('--sample_train',type=float,default=1.0,help='Fraction of the train dataset to sample')
-    parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')    
+    parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')       
+    parser.add_argument('--concept_pair_loss_weight',type=float,default=0.1,help='Weight for the concept pair loss in the loss')
+
     
     args = parser.parse_args()
     experiment_name = args.experiment_name
@@ -228,7 +230,7 @@ if __name__ == "__main__":
     
     existing_weights = ''
     if suffix == '_model_robustness':
-        exisitng_weights = 'resnet_model_robustness.pt'
+        existing_weights = 'resnet_model_robustness.pt'
     elif suffix == '_model_responsiveness':
         existing_weights = 'resnet_model_responsiveness.pt'
     
@@ -276,6 +278,7 @@ if __name__ == "__main__":
       n_tasks=n_tasks, # Number of output labels
       emb_size=16,
       concept_loss_weight=0.1,
+      concept_pair_loss_weight=args.concept_pair_loss_weight,
       learning_rate=0.01,
       optimizer="adam",
       c_extractor_arch=extractor_arch, # Replace this appropriately

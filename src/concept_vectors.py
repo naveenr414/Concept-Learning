@@ -270,12 +270,7 @@ def load_activations_model(experiment_name,max_examples,model_name,sess):
                                         LABEL_PATH)
     elif "Resnet50" in model_name:
         if model_name == "Resnet50":
-            GRAPH_PATH = "./dataset/models/resnet50/baseline.h5"
-        elif model_name == "Resnet50Robustness":
-            GRAPH_PATH = "./dataset/models/resnet50/robust.h5"
-        elif model_name == "Resnet50Responsiveness":
-            GRAPH_PATH = "./dataset/models/resnet50/responsive.h5"
-            
+            GRAPH_PATH = "./dataset/models/keras/model_resnet.h5"
         LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
         mymodel = ResnetWrapper(sess,
                                         GRAPH_PATH,
@@ -315,12 +310,16 @@ def get_activations_dictionary(attribute_list,sess,model_name="VGG16",
     
     start = time.time()
     
+    if model_name == "Resnet50":
+        bottleneck = "conv4_block6_out"
+
+    
     if delete_activations:
         delete_previous_activations(bottleneck,attribute_list)
 
     start = time.time()    
     act_generator = load_activations_model(experiment_name,max_examples,model_name,sess)
-        
+            
     acts = {}
     for i in attribute_list:
         start = time.time()
@@ -717,6 +716,11 @@ if __name__ == "__main__":
     elif 'model_mnist' in args.algorithm:
         suffix = args.algorithm.replace("model_mnist","")
         dataset = MNIST_Dataset()
+        attributes = dataset.get_attributes()
+        create_model_vectors(attributes,dataset,suffix,args.seed)
+    elif 'model_cub' in args.algorithm:
+        suffix = args.algorithm.replace("model_cub","")
+        dataset = CUB_Dataset()
         attributes = dataset.get_attributes()
         create_model_vectors(attributes,dataset,suffix,args.seed)
     else:

@@ -158,7 +158,8 @@ def responsiveness_model_metric(embedding_method,dataset,attributes,random_seeds
 
 
 def reset_dataset(dataset,seed,max_images):
-    """Reset the images and the activations for a dataset, then redownload them
+    """Reset the images and the activations for a dataset, then redownload them, using the test dataset
+        Used primarily with the truthfulness metric
     
     Arguments:
         dataset: Object from the Dataset class
@@ -175,7 +176,7 @@ def reset_dataset(dataset,seed,max_images):
     concepts = dataset.get_attributes()
     for attribute in concepts:
         create_folder_from_attribute(attribute,dataset.get_images_with_attribute,seed=seed,
-                                        suffix='',num_images=max_images)
+                                        suffix='',num_images=max_images,train=False)
         
     
     bottlenecks = ['block4_conv1']
@@ -258,8 +259,8 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
         Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
     """
         
-    n_concepts = 5
-    compare_concepts = 3
+    n_concepts = 10
+    compare_concepts = 2
     max_images = 25
     
     
@@ -287,21 +288,22 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
             co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
                                                                     co_occuring_concepts,seed)
             
-            temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
-                                                     co_occuring_concepts_hierarchy).correlation)
+            if len(co_occuring_concepts) == 1:
+                temp_truthfulness.append(int(co_occuring_concepts == co_occuring_concepts_hierarchy))
+            else:
+                temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
+                                                         co_occuring_concepts_hierarchy).correlation)
             
         avg_truthfulness.append(np.mean(temp_truthfulness))
             
         
     return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
-def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16"):
+def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16",eval_truthfulness=True):
     metrics = [stability_metric,robustness_image_metric,
-               responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric,
-              truthfulness_metric]
+               responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric]
     metric_names = ['Stability', 'Image Robustness', 
-                'Image Responsiveness','Model Robustness','Model Responsiveness',
-                   'Truthfulness']
+                'Image Responsiveness','Model Robustness','Model Responsiveness']
             
     results = {}
     
@@ -312,6 +314,13 @@ def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="
                         random_seeds)
         print("{}: {}".format(name, score))
         results[name] = score
+        
+    if eval_truthfulness:
+        results['Truthfulness'] = truthfulness_metric(embedding_method,
+                        dataset,
+                        attributes,
+                        random_seeds,
+                        model=model)
         
     return results
 
@@ -337,6 +346,8 @@ if __name__ == "__main__":
                responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric]
     metric_names = ['Truthfulness','Stability', 'Image Robustness', 
                 'Image Responsiveness','Model Robustness','Model Responsiveness']
+    
+    model = 'VGG16'
         
     algorithm = args.algorithm
     if algorithm == 'labels':
@@ -347,6 +358,7 @@ if __name__ == "__main__":
         embedding_method = load_concept2vec_vectors_simple
     elif algorithm == 'cem':
         embedding_method = load_cem_vectors_simple
+        model='Resnet50'
     elif algorithm == 'average':
         embedding_method = combine_embeddings_average(load_label_vectors_simple,load_tcav_vectors_simple)
     elif algorithm == 'concatenate':
@@ -355,11 +367,14 @@ if __name__ == "__main__":
         embedding_method = load_model_vectors_simple
     elif algorithm == 'tcav_dr':
         embedding_method = load_tcav_dr_vectors_simple
+    elif algorithm == 'vae':
+        embedding_method = load_vae_vectors_simple
     
     results = compute_all_metrics(embedding_method,
                                     dataset,
                                     attributes,
-                                    seeds)
+                                    seeds,
+                                 model=model)
     
     w = open("results/evaluation/{}.txt".format(args.algorithm),"w")
     for key in sorted(list(results.keys())):

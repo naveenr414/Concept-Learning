@@ -11,11 +11,14 @@ class Dataset:
     def get_attributes(self):
         pass
     
-    def get_data(self,seed=-1,suffix=""):
+    def get_data(self,seed=-1,suffix="",train=True):
         if suffix == "_model_robustness" or suffix == "_model_responsiveness":
             suffix = ""
-        
-        file_name = self.pkl_path.format(suffix)
+            
+        if train:
+            file_name = self.pkl_path.format(suffix)
+        else:
+            file_name = self.test_pkl_path.format(suffix)
         data = pickle.load(open(file_name,"rb"))
 
         if seed > -1:
@@ -23,12 +26,12 @@ class Dataset:
         random.shuffle(data)
         return data
     
-    def get_class_labels(self,seed=-1,suffix=""):
-        data = self.get_data(seed,suffix)
+    def get_class_labels(self,seed=-1,suffix="",train=True):
+        data = self.get_data(seed,suffix,train=train)
         return set([i['class_label'] for i in data])
     
-    def get_images_with_attribute(self,attribute_name,seed=-1,suffix=""):
-        data = self.get_data(seed,suffix)
+    def get_images_with_attribute(self,attribute_name,seed=-1,suffix="",train=True):
+        data = self.get_data(seed,suffix,train=train)
         attributes = self.get_attributes()
         attribute_index = attributes.index(attribute_name)
 
@@ -36,13 +39,13 @@ class Dataset:
                                for i in data if i['attribute_label'][attribute_index] == 1]
         return matching_attributes
     
-    def get_images_without_attribute(self,attribute_name,one_class=False,seed=-1,suffix=""):
-        data = self.get_data(seed,suffix)
+    def get_images_without_attribute(self,attribute_name,one_class=False,seed=-1,suffix="",train=True):
+        data = self.get_data(seed,suffix,train=train)
         attributes = self.get_attributes()
         attribute_index = attributes.index(attribute_name)
         
         if one_class:
-            all_classes = self.get_class_labels(seed,suffix)
+            all_classes = self.get_class_labels(seed,suffix,train=train)
             random_class = random.sample(list(all_classes),k=1)[0]
 
             matching_attributes = [self.path_to_image(i['img_path']) 
@@ -95,6 +98,7 @@ class Dataset:
 class MNIST_Dataset(Dataset):
     def __init__(self):
         self.pkl_path = "dataset/colored_mnist{}/images/train.pkl"
+        self.test_pkl_path = "dataset/colored_mnist{}/images/val.pkl"
         self.path_to_image = lambda path: "dataset/"+path
         self.all_files = "dataset/colored_mnist/images/*/*.png"
         self.root_folder_name = "colored_mnist"
@@ -303,7 +307,7 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
         for image in random_images:
             shutil.copy2(image,folder_location)
     
-def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffix='',num_images=100):
+def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffix='',num_images=100,train=True):
     """Create a new folder, with the images being all birds with a particular attribute
     
     Arguments:
@@ -311,6 +315,7 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
         attribute_function: Function that retrieves all matching images, given an attribute
             Either get_mnist_images_by_attribute or get_cub_images_by_attribute
         num_images: How many images to select from the attribute folder, at most
+        train: Whether or not to use the training dataset when creating images
 
     Returns:
         None
@@ -323,7 +328,7 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     if seed > -1:
         random.seed(seed)
     
-    image_locations = attribute_function(attribute_name,suffix=suffix,seed=seed)
+    image_locations = attribute_function(attribute_name,suffix=suffix,seed=seed,train=train)
     
     folder_location = "dataset/images/{}".format(attribute_name)
     if not os.path.isdir(folder_location):

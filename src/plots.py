@@ -160,7 +160,7 @@ def plot_dendogram(tree_info,labels):
     plt.figure(figsize =(15,7))
     dendrogram(tree_info,labels=labels,orientation='right',distance_sort='descending') 
     
-def plot_latent_space(vae, n=30, figsize=15,channels=3):
+def plot_latent_space(vae, n=30, figsize=15,channels=3,coords=[0,1],latent_size=2):
     """Plot the results for a VAE in a grid with images for different latent representations
     
     Arguments:
@@ -188,9 +188,17 @@ def plot_latent_space(vae, n=30, figsize=15,channels=3):
     for i, yi in enumerate(grid_y):
         for j, xi in enumerate(grid_x):
             grid_coord_to_flat[(i,j)] = count
-            z_sample.append([xi,yi])
+            
+            full_latent = np.zeros(latent_size)
+            full_latent[coords[0]] = xi
+            full_latent[coords[1]] = yi
+                        
+            z_sample.append(list(full_latent))
             
             count += 1
+            
+    z_sample = np.array(z_sample)
+    print(z_sample.shape)
             
     x_decoded = vae.decoder.predict(z_sample)
     

@@ -12,6 +12,8 @@ from tensorflow.keras import layers
 import glob
 from src.util import *
 import os
+import argparse
+from src.dataset import *
 
 class Sampling(layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
@@ -28,10 +30,10 @@ def create_encoder(channels,latent_dim):
     
     Arguments:
         channels: Number of channels in the image; 3 for RGB
-        latent_dim: Size of the latent vector (the middle part of the VAE
+        latent_dim: Size of the latent vector (the middle part of the VAE)
     """
     
-    encoder_inputs = keras.Input(shape=(28, 28, channels))
+    encoder_inputs = keras.Input(shape=(28,28, channels))
     x = layers.Conv2D(32, 3, activation="relu", strides=2, padding="same")(encoder_inputs)
     x = layers.Conv2D(64, 3, activation="relu", strides=2, padding="same")(x)
     x = layers.Flatten()(x)
@@ -40,13 +42,50 @@ def create_encoder(channels,latent_dim):
     z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
     z = Sampling()([z_mean, z_log_var])
     return  keras.Model(encoder_inputs, [z_mean, z_log_var, z], name="encoder")
+
+def create_encoder_model(channels,latent_dim,model_name="resnet50"):
+    """Create the encoder part of a VAE model by using a pre-trained model
+    
+    Arguments:
+        channels: Number of channels in the image; 3 for RGB
+        latent_dim: Size of the latent vector (the middle part of the VAE)
+        model_name: Which pre-trained model we're using, such as resnet50
+        
+    Returns: Keras model
+    """
+    
+    if model_name == "resnet50":
+        model = tf.keras.applications.resnet.ResNet50(weights = "imagenet", 
+                               include_top=False, 
+                               input_shape = (32,32,channels),
+                               pooling='max')
+    elif model_name == "vgg16":
+        model = tf.keras.applications.vgg16.VGG16(weights='imagenet',
+                                include_top=False,
+                                input_shape = (32,32,channels),
+                                pooling='max')
+   
+    weights = np.array(model.get_weights())  
+    new_weights = responsive_weights(weights)
+    model.set_weights(new_weights)
+    
+    for l in model.layers:
+        l.trainable = False
+        
+    x = tf.keras.layers.Flatten()(model.output)
+    x = layers.Dense(16, activation="relu")(x)
+    z_mean = layers.Dense(latent_dim, name="z_mean")(x)
+    z_log_var = layers.Dense(latent_dim, name="z_log_var")(x)
+    z = Sampling()([z_mean, z_log_var])
+    return  keras.Model(model.input, [z_mean, z_log_var, z], name="encoder")
+  
     
 def create_decoder(channels,latent_dim):
     """Create the decoder part of a VAE model
     
     Arguments:
         channels: Number of channels in the image; 3 for RGB
-        latent_dim: Size of the latent vector (the middle part of the VAE
+        latent_dim: Size of the latent vector (the middle part of the VAE)
     """
     
     latent_inputs = keras.Input(shape=(latent_dim,))
@@ -58,15 +97,17 @@ def create_decoder(channels,latent_dim):
     return keras.Model(latent_inputs, decoder_outputs, name="decoder")
 
 class VAE(keras.Model):
-    def __init__(self, encoder, decoder,**kwargs):
+    def __init__(self, encoder, decoder,concept_alignment=False,**kwargs):
         super().__init__(**kwargs)
         self.encoder = encoder
         self.decoder = decoder
+        self.concept_alignment = False
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
         )
         self.kl_loss_tracker = keras.metrics.Mean(name="kl_loss")
+        self.concept_loss_tracker = keras.metrics.Mean(name="concept_loss")
 
     @property
     def metrics(self):
@@ -74,9 +115,13 @@ class VAE(keras.Model):
             self.total_loss_tracker,
             self.reconstruction_loss_tracker,
             self.kl_loss_tracker,
+            self.concept_loss_tracker,
         ]
 
     def train_step(self, data):
+        data,concepts = data[0]
+        concepts = tf.cast(concepts,tf.float32) 
+        
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z = self.encoder(data)
             reconstruction = self.decoder(z)
@@ -87,18 +132,33 @@ class VAE(keras.Model):
             )
             kl_loss = -0.5 * (1 + z_log_var - tf.square(z_mean) - tf.exp(z_log_var))
             kl_loss = tf.reduce_mean(tf.reduce_sum(kl_loss, axis=1))
-            total_loss = reconstruction_loss + kl_loss
+            
+            concept_loss = 0
+            
+            if self.concept_alignment:
+                masked_concepts = z*concepts
+                reconstruction_mask = self.decoder(masked_concepts)
+                concept_loss = tf.reduce_mean(
+                    tf.reduce_sum(
+                        keras.losses.binary_crossentropy(data, reconstruction_mask), axis=(1,2)
+                    )
+                )
+            
+            total_loss = reconstruction_loss + kl_loss + concept_loss
         grads = tape.gradient(total_loss, self.trainable_weights)
         self.optimizer.apply_gradients(zip(grads, self.trainable_weights))
         self.total_loss_tracker.update_state(total_loss)
         self.reconstruction_loss_tracker.update_state(reconstruction_loss)
         self.kl_loss_tracker.update_state(kl_loss)
+        self.concept_loss_tracker.update_state(concept_loss)
         return {
             "loss": self.total_loss_tracker.result(),
             "reconstruction_loss": self.reconstruction_loss_tracker.result(),
             "kl_loss": self.kl_loss_tracker.result(),
+            "concept_loss": self.concept_loss_tracker.result(),
         }
 
+    
 def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embedding=None):
     """Create a skipgram architecture in keras, given an embedding dimension and a vocab size
     Do this by first turning a (target,context) pair into embeddings, taking the dot, then 
@@ -132,7 +192,7 @@ def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embeddin
     
     return SkipGram
 
-def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30):
+def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,concept_alignment=False):
     """Train a VAE model on some dataset, such as MNIST
     
     Arguments:
@@ -147,22 +207,26 @@ def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30):
     tf.keras.utils.set_random_seed(seed)
     
     all_data = dataset.get_data(seed=seed,suffix=suffix)
-    all_files = ['dataset'+i['img_path'] for i in all_data]
+    all_files = ['dataset/'+i['img_path'] for i in all_data]
     images = np.array([file_to_numpy(i) for i in all_files])
+    concepts = np.array([i['attribute_label'] for i in all_data])
 
     decoder_3 = create_decoder(3,latent_dim)
     encoder_3 = create_encoder(3,latent_dim)
 
     vae = VAE(encoder_3, decoder_3)
     vae.compile(optimizer=keras.optimizers.Adam())
-    vae.fit(images, epochs=epochs, batch_size=128)    
+    
+    vae.fit([images,concepts], epochs=epochs, batch_size=128,concept_alignment=concept_alignment)    
     
     if save_location != "":
         vae.save_weights("results/models/{}".format(save_location))
 
-    save_vae(vae,dataset,suffix,seed)
+    save_vae(vae,dataset,suffix,seed,concept_alignment=concept_alignment)
+    
+
         
-def save_vae(model,dataset,suffix,seed):
+def save_vae(model,dataset,suffix,seed,concept_alignment=False):
     all_data = dataset.get_data()
     random.shuffle(all_data)
     
@@ -181,7 +245,10 @@ def save_vae(model,dataset,suffix,seed):
         average_embedding_by_concept[name] = np.array([mean_embedding])
 
     folder_name = "results/vae/{}/{}".format(dataset.experiment_name+suffix,seed)
-        
+
+    if concept_alignment:
+        folder_name = "results/vae_concept/{}/{}".format(dataset.experiment_name+suffix,seed)
+    
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
         
@@ -189,28 +256,29 @@ def save_vae(model,dataset,suffix,seed):
         file_name = "{}/{}.npy".format(folder_name,concept)
         np.save(open(file_name,"wb"),average_embedding_by_concept[concept])
 
-if __name___ == "__main__":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
     parser.add_argument('--algorithm',type=str,
                         help='Which algorithm to use to generate concept vectors')
     parser.add_argument('--dataset', type=str,
                         help='Name of the dataset which we generate, such as mnist')
-    parser.add_argument('--suffix', type=str,
-                        help='Specific subclass of dataset we\'re using')
     parser.add_argument('--seed',type=int, default=42,
                         help='Random seed used in tcav experiment')
 
     args = parser.parse_args()
     
-    if args.dataset.lower() == 'mnist':
+    if "mnist" in args.dataset.lower():
         dataset = MNIST_Dataset()
-    elif args.dataset.lower() == 'cub':
+        suffix = args.dataset.lower().replace("mnist","")
+    elif "cub" in args.dataset.lower():
         dataset = CUB_Dataset()
+        suffix = args.dataset.lower().replace("cub","")
     else:
         raise Exception("{} not implemented".format(args.dataset))
     
     seed = args.seed
-    suffix = args.suffix
     
     if args.algorithm == 'vae':
-        train_VAE(dataset,suffix,seed)
+        train_VAE(dataset,suffix,seed,epochs=30,latent_dim=4)
+    elif args.algorithm == 'vae_concept':
+        train_VAE(dataset,suffix,seed,epochs=30,latent_dim=len(dataset.get_attributes()),concept_alignment=True)

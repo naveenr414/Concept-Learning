@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 from cem.models.cbm import ConceptBottleneckModel
 import numpy as np
 import os
+import sklearn.metrics
 
 from torchvision.models import resnet50
 
@@ -23,6 +24,58 @@ class LambdaLayer(torch.nn.Module):
 ## OUR MODEL
 ################################################################################
 
+def compute_accuracy(
+    c_pred,
+    y_pred,
+    c_true,
+    y_true,
+):
+    if (len(y_pred.shape) < 2) or (y_pred.shape[-1] == 1):
+        return compute_bin_accuracy(
+            c_pred,
+            y_pred,
+            c_true,
+            y_true,
+        )
+    c_pred = c_pred.reshape(-1).cpu().detach() > 0.5
+    y_probs = torch.nn.Softmax(dim=-1)(y_pred).cpu().detach()
+    used_classes = np.unique(y_true.reshape(-1).cpu().detach())
+    y_probs = y_probs[:, sorted(list(used_classes))]
+    y_pred = y_pred.argmax(dim=-1).cpu().detach()
+    c_true = c_true.reshape(-1).cpu().detach()
+    y_true = y_true.reshape(-1).cpu().detach()
+    c_accuracy = sklearn.metrics.accuracy_score(c_true, c_pred)
+    try:
+        c_auc = sklearn.metrics.roc_auc_score(
+            c_true,
+            c_pred,
+            multi_class='ovo',
+        )
+    except:
+        c_auc = 0.0
+    try:
+        c_f1 = sklearn.metrics.f1_score(
+            c_true,
+            c_pred,
+            average='macro',
+        )
+    except:
+        c_f1 = 0
+    y_accuracy = sklearn.metrics.accuracy_score(y_true, y_pred)
+    try:
+        y_auc = sklearn.metrics.roc_auc_score(
+            y_true,
+            y_probs,
+            multi_class='ovo',
+        )
+    except:
+        y_auc = 0.0
+    try:
+        y_f1 = sklearn.metrics.f1_score(y_true, y_pred, average='macro')
+    except:
+        y_f1 = 0.0
+    return (c_accuracy, c_auc, c_f1), (y_accuracy, y_auc, y_f1)
+
 
 class ConceptEmbeddingModel(ConceptBottleneckModel):
     def __init__(
@@ -32,6 +85,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         experiment_name="default",
         emb_size=16,
         concept_loss_weight=1,
+        concept_pair_loss_weight=0.1,
         task_loss_weight=1,
         momentum=0.9,
         learning_rate=0.01,
@@ -168,6 +222,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             if n_tasks > 1 else torch.nn.BCEWithLogitsLoss()
         )
         self.concept_loss_weight = concept_loss_weight
+        self.concept_pair_loss_weight = concept_pair_loss_weight
         self.momentum = momentum
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
@@ -181,7 +236,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         
         self.all_active_concepts = [np.zeros((0,self.emb_size)) for i in range(self.n_concepts)]
         self.all_inactive_concepts = [np.zeros((0,self.emb_size)) for i in range(self.n_concepts)]
-        self.concept_folder_location = "../../main_code/results/cem_concepts/{}/{}".format(experiment_name,seed)
+        self.concept_folder_location = "cem_concepts/{}/{}".format(experiment_name,seed)
         
         if not os.path.exists(self.concept_folder_location):
             os.makedirs(self.concept_folder_location)
@@ -234,6 +289,9 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         probs = []
         full_vectors = []
         sem_probs = []
+        
+        all_contexts = []
+        
         for i, context_gen in enumerate(self.concept_context_generators):
             if self.shared_prob_gen:
                 prob_gen = self.concept_prob_generators[0]
@@ -259,6 +317,8 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             context_pos = context[:, :self.emb_size]
             context_neg = context[:, self.emb_size:]
             
+            all_contexts.append(context)
+            
             # Write which concepts were used to compute outputs
             if not train:
                 self.update_concepts(context,self.emb_size,c,i)
@@ -281,7 +341,100 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         c_sem = torch.cat(sem_probs, axis=-1)
         c_pred = torch.cat(full_vectors, axis=-1)
         y = self.c2y_model(c_pred)
-        return c_sem, c_pred, y
+        
+        sizes = [i.size() for i in all_contexts]
+        
+        contexts = torch.stack(all_contexts)
+        return c_sem, c_pred, y, contexts
+
+    def _run_step(self, batch, batch_idx, train=False):
+        x, y, c = self._unpack_batch(batch)
+        y = y.long()
+        if self.intervention_idxs is not None:
+            c_sem, c_logits, y_logits,context = self._forward(
+                x,
+                intervention_idxs=self.intervention_idxs,
+                c=c,
+                train=train,
+            )
+        else:
+            c_sem, c_logits, y_logits,context = self._forward(x, c=c, train=train)
+            
+        if self.task_loss_weight != 0:
+            task_loss = self.loss_task(
+                y_logits if y_logits.shape[-1] > 1 else y_logits.reshape(-1),
+                y,
+            )
+            task_loss_scalar = task_loss.detach()
+        else:
+            task_loss = 0
+            task_loss_scalar = 0
+        if self.concept_loss_weight != 0:
+            # We separate this so that we are allowed to
+            # use arbitrary activations (i.e., not necessarily in [0, 1])
+            # whenever no concept supervision is provided
+            concept_loss = self.loss_concept(c_sem, c)
+            loss = self.concept_loss_weight * concept_loss + task_loss
+            concept_loss_scalar = concept_loss.detach()
+        else:
+            loss = task_loss
+            concept_loss_scalar = 0.0
+            
+        concept_pair_loss_weight = self.concept_pair_loss_weight
+        if concept_pair_loss_weight != 0:
+            concept_pair_loss = 0
+            
+            for pair_one in range(context.shape[0]):
+                for pair_two in range(pair_one+1,context.shape[0]):
+                    equal_pairs = torch.dot(c[:,pair_one],c[:,pair_two])
+                    equal_pairs /= len(c)
+                    
+                    concept_one = context[pair_one]
+                    concept_two = context[pair_two]
+
+                    concept_pair_loss += equal_pairs * torch.nn.MSELoss()(concept_one,concept_two)
+                        
+            concept_pair_loss *= concept_pair_loss_weight
+            
+            loss += concept_pair_loss
+                        
+        if self.normalize_loss:
+            loss = loss / (1 + self.concept_loss_weight * c.shape[-1] + concept_pair_loss_weight * c.shape[-1])
+        # compute accuracy
+        (c_accuracy, c_auc, c_f1), (y_accuracy, y_auc, y_f1) = compute_accuracy(
+            c_sem,
+            y_logits,
+            c,
+            y,
+        )
+        result = {
+            "c_accuracy": c_accuracy,
+            "c_auc": c_auc,
+            "c_f1": c_f1,
+            "y_accuracy": y_accuracy,
+            "y_auc": y_auc,
+            "y_f1": y_f1,
+            "concept_loss": concept_loss_scalar,
+            "task_loss": task_loss_scalar,
+            "loss": loss.detach(),
+            "avg_c_y_acc": (c_accuracy + y_accuracy) / 2,
+        }
+        if self.top_k_accuracy is not None:
+            y_true = y.reshape(-1).cpu().detach()
+            y_pred = y_logits.cpu().detach()
+            labels = list(range(self.n_tasks))
+            top_k_val = self.top_k_accuracy
+            if len(labels) == 2:
+                y_pred = y_pred[:,0]
+                top_k_val = 1
+            y_top_k_accuracy = sklearn.metrics.top_k_accuracy_score(
+                y_true,
+                y_pred,
+                k=top_k_val,
+                labels=labels,
+            )
+            result[f'y_top_{top_k_val}_accuracy'] = y_top_k_accuracy
+        return loss, result
     
     def reset_concepts(self):
         # Save our current concepts before writing 
