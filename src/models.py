@@ -25,7 +25,7 @@ class Sampling(layers.Layer):
         epsilon = tf.keras.backend.random_normal(shape=(batch, dim))
         return z_mean + tf.exp(0.5 * z_log_var) * epsilon
 
-def create_encoder(channels,latent_dim):
+def create_encoder(size,channels,latent_dim):
     """Create the encoder part of a VAE model
     
     Arguments:
@@ -33,7 +33,7 @@ def create_encoder(channels,latent_dim):
         latent_dim: Size of the latent vector (the middle part of the VAE)
     """
     
-    encoder_inputs = keras.Input(shape=(28,28, channels))
+    encoder_inputs = keras.Input(shape=(size,size, channels))
     x = layers.Conv2D(32, 3, activation="relu", strides=2, padding="same")(encoder_inputs)
     x = layers.Conv2D(64, 3, activation="relu", strides=2, padding="same")(x)
     x = layers.Flatten()(x)
@@ -80,7 +80,7 @@ def create_encoder_model(channels,latent_dim,model_name="resnet50"):
     return  keras.Model(model.input, [z_mean, z_log_var, z], name="encoder")
   
     
-def create_decoder(channels,latent_dim):
+def create_decoder(size,channels,latent_dim):
     """Create the decoder part of a VAE model
     
     Arguments:
@@ -89,8 +89,8 @@ def create_decoder(channels,latent_dim):
     """
     
     latent_inputs = keras.Input(shape=(latent_dim,))
-    x = layers.Dense(7 * 7 * 64, activation="relu")(latent_inputs)
-    x = layers.Reshape((7, 7, 64))(x)
+    x = layers.Dense(size//4 * size//4 * 64, activation="relu")(latent_inputs)
+    x = layers.Reshape((size//4, size//4, 64))(x)
     x = layers.Conv2DTranspose(64, 3, activation="relu", strides=2, padding="same")(x)
     x = layers.Conv2DTranspose(32, 3, activation="relu", strides=2, padding="same")(x)
     decoder_outputs = layers.Conv2DTranspose(channels, 3, activation="sigmoid", padding="same")(x)
@@ -101,7 +101,7 @@ class VAE(keras.Model):
         super().__init__(**kwargs)
         self.encoder = encoder
         self.decoder = decoder
-        self.concept_alignment = False
+        self.concept_alignment = concept_alignment
         self.total_loss_tracker = keras.metrics.Mean(name="total_loss")
         self.reconstruction_loss_tracker = keras.metrics.Mean(
             name="reconstruction_loss"
@@ -119,8 +119,9 @@ class VAE(keras.Model):
         ]
 
     def train_step(self, data):
-        data,concepts = data[0]
-        concepts = tf.cast(concepts,tf.float32) 
+        if self.concept_alignment:
+            data,concepts = data[0]
+            concepts = tf.cast(concepts,tf.float32) 
         
         with tf.GradientTape() as tape:
             z_mean, z_log_var, z = self.encoder(data)
@@ -192,6 +193,17 @@ def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embeddin
     
     return SkipGram
 
+def resize_cub(images):
+    """Function to resize CUB images to 64x64 for the VAE
+    
+    Arguments:
+        images: Numpy array of images that will be resized
+        
+    Returns: numpy array of the resized images
+    """
+    
+    return np.array([tf.image.resize(i,(64,64)) for i in images])
+
 def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,concept_alignment=False):
     """Train a VAE model on some dataset, such as MNIST
     
@@ -203,6 +215,9 @@ def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,conce
     Returns: Nothing
     """
     
+    if concept_alignment:
+        latent_dim = len(dataset.get_attributes())
+            
     np.random.seed(seed)
     tf.keras.utils.set_random_seed(seed)
     
@@ -211,13 +226,27 @@ def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,conce
     images = np.array([file_to_numpy(i) for i in all_files])
     concepts = np.array([i['attribute_label'] for i in all_data])
 
-    decoder_3 = create_decoder(3,latent_dim)
-    encoder_3 = create_encoder(3,latent_dim)
-
-    vae = VAE(encoder_3, decoder_3)
-    vae.compile(optimizer=keras.optimizers.Adam())
     
-    vae.fit([images,concepts], epochs=epochs, batch_size=128,concept_alignment=concept_alignment)    
+    size = 28
+    
+    if dataset.experiment_name == "cub":
+        # Convert all images to the same size
+        size = 64
+        images = resize_cub(images)
+        
+    decoder_3 = create_decoder(size,3,latent_dim)
+    encoder_3 = create_encoder(size,3,latent_dim)
+
+    vae = VAE(encoder_3, decoder_3,concept_alignment=concept_alignment)
+    vae.compile(optimizer=keras.optimizers.Adam())
+
+    concepts = tf.convert_to_tensor(concepts)
+    images = tf.convert_to_tensor(images)
+    
+    if concept_alignment:
+        vae.fit([images,concepts], epochs=epochs, batch_size=128)    
+    else:
+        vae.fit(images,epochs=epochs,batch_size=128)
     
     if save_location != "":
         vae.save_weights("results/models/{}".format(save_location))
@@ -230,9 +259,9 @@ def save_vae(model,dataset,suffix,seed,concept_alignment=False):
     all_data = dataset.get_data()
     random.shuffle(all_data)
     
-    all_data = all_data[:10000]
+    all_data = all_data[:10000] 
     all_images = [file_to_numpy("dataset/"+i['img_path']) for i in all_data]
-    all_images = np.array(all_images)
+    all_images = resize_cub(np.array(all_images))
     
     embeddings = model.encoder.predict(np.array(all_images).astype("float32")/255)[2]    
 

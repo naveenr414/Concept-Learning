@@ -621,6 +621,21 @@ def load_vae_vectors_simple(attribute,dataset,suffix,seed=-1):
     """
 
     return load_vector_from_folder("vae")(attribute,dataset,suffix,seed=seed)
+
+def load_vae_concept_vectors_simple(attribute,dataset,suffix,seed=-1):
+    """Retrieve concept vectors based on a generative VAE model
+    
+    Arguments:
+        attribute: A single attribute
+        dataset: Object from the dataset class
+        suffix: String, which is a specific instance of the dataset
+        seed: Random seed
+    
+    Returns:
+        Numpy array of latent representations from VAEs
+    """
+
+    return load_vector_from_folder("vae_concept")(attribute,dataset,suffix,seed=seed)
     
 def combine_embeddings_average(f_one,f_two):
     """Given two embedding functions, embedding_one and embedding_two, return a function that returns the 
