@@ -65,33 +65,37 @@ class Dataset:
     
     def create_gaussian(self):
         flip_probability = .01
-        input_file = self.pkl_path.format('')
-        output_file = self.pkl_path.format('_image_robustness')
-        flip_concept_labels_file(input_file,
-                                 output_file,
-                                 flip_probability,
-                                 lambda s: s.replace(self.root_folder_name,
-                                                     self.root_folder_name+"_image_robustness"))
+        
+        for file_name in [self.pkl_path,self.test_pkl_path]:
+            input_file = file_name.format('')
+            output_file = file_name.format('_image_robustness')
+            flip_concept_labels_file(input_file,
+                                     output_file,
+                                     flip_probability,
+                                     self.fix_path,
+                                     "_image_robusntess")
 
         self.run_function(self.root_folder_name+"_image_robustness",lambda arr: add_gaussian_noise(arr,0,50))
     
     def create_junk(self):
         flip_probability = 0.5
-        input_file = self.pkl_path.format('')
-        output_file = self.pkl_path.format('_image_responsiveness')
+        for file_name in [self.pkl_path,self.test_pkl_path]:
+            input_file = file_name.format('')
+            output_file = file_name.format('_image_responsiveness')
 
-        flip_concept_labels_file(input_file,
-                                 output_file,
-                                 flip_probability,
-                                 lambda s: s.replace(self.root_folder_name,
-                                                     self.root_folder_name+"_image_responsiveness"))
-        self.run_function(self.root_folder_name+"_image_robustness",lambda arr: create_junk_image)
+            flip_concept_labels_file(input_file,
+                                     output_file,
+                                     flip_probability,
+                                     self.fix_path,
+                                     "_image_responsiveness")
+        
+        self.run_function(self.root_folder_name+"_image_responsiveness",lambda arr: create_junk_image(arr))
     
     def run_function(self,output_folder_name,func):
         all_input_files = glob.glob(self.all_files)
 
         for input_file in all_input_files:
-            corresponding_output = input_file.replace(self.root_folder_name,output_folder_name)
+            corresponding_output = input_file.replace(self.root_folder_name,output_folder_name,1)
             write_new_image_function(input_file,corresponding_output,func)
 
     
@@ -124,9 +128,17 @@ class MNIST_Dataset(Dataset):
         attributes += ["spurious"]
         return attributes
 
+    def fix_path(self,path,suffix):
+        file_loc = "/".join(path.split("/")[-2:])
+        new_path = "colored_mnist{}/images/{}".format(suffix,file_loc)
+
+        return new_path
+
+
 class CUB_Dataset(Dataset):
     def __init__(self):
         self.pkl_path = "dataset/CUB{}/preprocessed/train.pkl"
+        self.test_pkl_path = "dataset/CUB{}/preprocessed/val.pkl"
         self.path_to_image = lambda path: "dataset/CUB/images/" + path.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","")
         self.all_files = "dataset/CUB/images/CUB_200_2011/images/*/*.jpg"
         self.root_folder_name = "CUB"
@@ -137,6 +149,12 @@ class CUB_Dataset(Dataset):
         lines = open(attributes_file).read().strip().split("\n")
         attributes = [i.split(" ")[1] for i in lines]
         return attributes
+    
+    def fix_path(self,path,suffix):
+        file_loc = "/".join(path.split("/")[-2:])
+        new_path = "CUB{}/images/CUB_200_2011/images/{}".format(suffix,file_loc)
+
+        return new_path
 
 class XOR_Dataset(Dataset):
     def __init__(self):
@@ -200,7 +218,7 @@ def write_new_image_function(input_path,output_path,func):
     output_image = Image.fromarray(new_arr)
     output_image.save(output_path)
         
-def flip_concept_labels(concept_list,flip_prob,img_path_update):
+def flip_concept_labels(concept_list,flip_prob,img_path_update,suffix):
     """Flip probabilities of concept labels according to some probability
     
     Arguments:
@@ -215,7 +233,7 @@ def flip_concept_labels(concept_list,flip_prob,img_path_update):
     new_arr = deepcopy(concept_list)
     
     for data in new_arr:
-        data['img_path'] = img_path_update(data['img_path'])
+        data['img_path'] = img_path_update(data['img_path'],suffix)
         
         for i in range(len(data['attribute_label'])):
             if np.random.random() < flip_prob:
@@ -223,7 +241,7 @@ def flip_concept_labels(concept_list,flip_prob,img_path_update):
                 
     return new_arr
 
-def flip_concept_labels_file(input_file,output_file,flip_probability,img_path_update):
+def flip_concept_labels_file(input_file,output_file,flip_probability,img_path_update,suffix):
     """Given an input file with concept labels, such as train.pkl, and an output file, flip attribute_labels with 
         probability flip_probability
         
@@ -239,7 +257,7 @@ def flip_concept_labels_file(input_file,output_file,flip_probability,img_path_up
     """
     
     all_concepts = pickle.load(open(input_file,"rb"))
-    new_all_concepts = flip_concept_labels(all_concepts,flip_probability,img_path_update)
+    new_all_concepts = flip_concept_labels(all_concepts,flip_probability,img_path_update,suffix)
     pickle.dump(new_all_concepts,open(output_file,"wb"))
         
 
