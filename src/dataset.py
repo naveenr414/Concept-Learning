@@ -34,7 +34,7 @@ class Dataset:
         data = self.get_data(seed,suffix,train=train)
         attributes = self.get_attributes()
         attribute_index = attributes.index(attribute_name)
-
+        
         matching_attributes = [self.path_to_image(i['img_path']) 
                                for i in data if i['attribute_label'][attribute_index] == 1]
         return matching_attributes
@@ -139,7 +139,7 @@ class CUB_Dataset(Dataset):
     def __init__(self):
         self.pkl_path = "dataset/CUB{}/preprocessed/train.pkl"
         self.test_pkl_path = "dataset/CUB{}/preprocessed/val.pkl"
-        self.path_to_image = lambda path: "dataset/CUB/images/" + path.replace("/juice/scr/scr102/scr/thaonguyen/CUB_supervision/datasets/","")
+        self.path_to_image = lambda path: "dataset/"+path
         self.all_files = "dataset/CUB/images/CUB_200_2011/images/*/*.jpg"
         self.root_folder_name = "CUB"
         self.experiment_name = "cub"
