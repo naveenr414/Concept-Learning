@@ -225,7 +225,6 @@ def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,conce
     all_files = ['dataset/'+i['img_path'] for i in all_data]
     images = np.array([file_to_numpy(i) for i in all_files])
     concepts = np.array([i['attribute_label'] for i in all_data])
-
     
     size = 28
     

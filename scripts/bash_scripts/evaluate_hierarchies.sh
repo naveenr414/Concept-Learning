@@ -1,4 +1,4 @@
-for algorithm in vae cem labels concept2vec concatenate model tcav_dr tcav
+for algorithm in model
 do 
-    python src/metrics.py --algorithm $algorithm --dataset mnist
+    python src/metrics.py --algorithm $algorithm --dataset cub
 done 

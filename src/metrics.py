@@ -124,7 +124,8 @@ def robustness_model_metric(embedding_method,dataset,attributes,random_seeds,bas
     """Compute the model robustness for metric for a set of random seeds, given a hierarchy+embedding method
     
     Arguments: 
-        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+        embedding_method: A simplified embedding creation method, such as load_
+cem_vectors_simple; 
             Simply loads embeddings, does not train them from scratch 
         dataset: String representing which dataset we're using, such as "cub"
         attributes: List of attributes we want to create embeddings for
@@ -259,8 +260,8 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
         Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
     """
         
-    n_concepts = 10
-    compare_concepts = 2
+    n_concepts = 5
+    compare_concepts = 5
     max_images = 25
     
     
@@ -300,10 +301,10 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
     return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
 def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16",eval_truthfulness=True):
-    metrics = [stability_metric,robustness_image_metric,
-               responsiveness_image_metric,robustness_model_metric,responsiveness_model_metric]
-    metric_names = ['Stability', 'Image Robustness', 
-                'Image Responsiveness','Model Robustness','Model Responsiveness']
+    metrics = [stability_metric, #robustness_image_metric,responsiveness_image_metric,
+               robustness_model_metric,responsiveness_model_metric]
+    metric_names = ['Stability', #'Image Robustness', 'Image Responsiveness',
+                'Model Robustness','Model Responsiveness']
             
     results = {}
     
@@ -359,6 +360,9 @@ if __name__ == "__main__":
     elif algorithm == 'cem':
         embedding_method = load_cem_vectors_simple
         model='Resnet50'
+    elif algorithm == 'cem_concept':
+        embedding_method = load_cem_loss_vectors_simple
+        model = 'Resnet50'
     elif algorithm == 'average':
         embedding_method = combine_embeddings_average(load_label_vectors_simple,load_tcav_vectors_simple)
     elif algorithm == 'concatenate':
@@ -369,7 +373,9 @@ if __name__ == "__main__":
         embedding_method = load_tcav_dr_vectors_simple
     elif algorithm == 'vae':
         embedding_method = load_vae_vectors_simple
-    
+    elif algorithm == 'vae_concept':
+        embedding_method = load_vae_concept_vectors_simple
+
     results = compute_all_metrics(embedding_method,
                                     dataset,
                                     attributes,

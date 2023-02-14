@@ -27,7 +27,7 @@ class VGGWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
         return np.array([224,224,3])
 
-def load_cem_vectors(experiment_name,concept_number,seed=-1):
+def load_cem_vectors(experiment_name,concept_number,seed=-1,loss=False):
     """Load all the 'active' embeddings from Concept Embedding Models
     
     Arguments:
@@ -35,11 +35,14 @@ def load_cem_vectors(experiment_name,concept_number,seed=-1):
             Concept files are of form {experiment_name}_concept...
         concept_number: An index for which concept is used
             Should correspond to the index in the 'c' array in CEM
+        loss: Whether or not to load the concept vectors with the extra 'concept_loss' term
 
     Returns:
         Numpy array of size (k,n), where k = number of concept vectors, and n = size of embedding
     """
     dataset_location = "results/cem_concepts"
+    if loss:
+        dataset_location+="_loss"
     
     if seed == -1:
         all_seeds = get_seed_numbers(dataset_location+"/"+experiment_name)
@@ -541,6 +544,23 @@ def load_cem_vectors_simple(attribute,dataset,suffix,seed=-1):
     attribute_index = all_attributes.index(attribute)
     return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
 
+def load_cem_loss_vectors_simple(attribute,dataset,suffix,seed=-1):
+    """Simplified call to create vector from cub/mnist that is standardized across embeddings
+    
+    Arguments:
+        attribute: Which concept we're looking to get vectors for, as a string
+        dataset: Object from the dataset class
+        suffix: String; which specific instance of the dataset are we testing out 
+    
+    Returns: 
+        Numpy array of label-based vectors
+    """
+    
+    all_attributes = dataset.get_attributes()
+    attribute_index = all_attributes.index(attribute)
+    return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed,loss=True)
+
+
 def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create vector using a SkipGram that is standardized across embeddings
     
@@ -575,7 +595,7 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
 
 def load_vector_from_folder(folder_name):
     def load_vectors_simple(attribute,dataset,suffix,seed=-1):
-        return np.load("results/{}/{}/{}/{}.npy".format(folder_name,dataset.experiment_name+suffix,seed,attribute))
+        return np.load(open("results/{}/{}/{}/{}.npy".format(folder_name,dataset.experiment_name+suffix,seed,attribute),"rb"),allow_pickle=True)
 
     return load_vectors_simple
     
@@ -695,7 +715,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
     parser.add_argument('--algorithm',type=str,
                         help='Which algorithm to use to generate concept vectors')
-    parser.add_argument('--class_name', type=str,
+    parser.add_argument('--class_name', type=str, default='',
                         help='Name of the ImageNet class for which concept vectors are generated.')
     parser.add_argument('--target', type=str,
                         help='Target which the concept vectors are aiming to predict.',default='zebra')
@@ -718,8 +738,9 @@ if __name__ == "__main__":
     if args.algorithm == 'tcav':
         create_tcav_vectors([args.class_name],args.target,args.model_name[args.bottleneck],
                             args.num_random_exp,alphas=[args.alpha],seed=args.seed)
-    elif args.algorithm == 'tcav_cub':
+    elif 'tcav_cub' in args.algorithm:
         suffix = args.algorithm.replace("tcav_cub","")
+        
         create_tcav_dataset(args.class_name,CUB_Dataset(),
                             args.num_random_exp,args.images_per_folder,
                             seed=args.seed,suffix=suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
@@ -737,6 +758,7 @@ if __name__ == "__main__":
         suffix = args.algorithm.replace("model_cub","")
         dataset = CUB_Dataset()
         attributes = dataset.get_attributes()
-        create_model_vectors(attributes,dataset,suffix,args.seed)
+        create_model_vectors(attributes[:len(attributes)//2],dataset,suffix,args.seed)
+        create_model_vectors(attributes[len(attributes)//2:],dataset,suffix,args.seed)
     else:
         raise Exception("{} not implemented to generate concept vectors".format(args.algorithm))
