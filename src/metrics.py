@@ -301,13 +301,12 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
     return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
 def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16",eval_truthfulness=True):
-    metrics = [stability_metric, #robustness_image_metric,responsiveness_image_metric,
+    metrics = [stability_metric, robustness_image_metric,responsiveness_image_metric,
                robustness_model_metric,responsiveness_model_metric]
-    metric_names = ['Stability', #'Image Robustness', 'Image Responsiveness',
+    metric_names = ['Stability', 'Image Robustness', 'Image Responsiveness',
                 'Model Robustness','Model Responsiveness']
             
     results = {}
-    
     for metric,name in zip(metrics,metric_names):
         score = metric(embedding_method,
                         dataset,
@@ -315,7 +314,7 @@ def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="
                         random_seeds)
         print("{}: {}".format(name, score))
         results[name] = score
-        
+    
     if eval_truthfulness:
         results['Truthfulness'] = truthfulness_metric(embedding_method,
                         dataset,
