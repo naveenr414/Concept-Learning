@@ -4,7 +4,6 @@ from cem.models.cbm import ConceptBottleneckModel
 import numpy as np
 import os
 import sklearn.metrics
-
 from torchvision.models import resnet50
 
 ################################################################################
@@ -109,6 +108,8 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         existing_weights='',
         gpu=int(torch.cuda.is_available()),
         seed=-1,
+        related_concepts=None,
+        vae_model = None,
     ):        
         pl.LightningModule.__init__(self)
         try:
@@ -148,7 +149,9 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         self.shared_prob_gen = shared_prob_gen
         self.top_k_accuracy = top_k_accuracy
         self.intervention_idxs = intervention_idxs
+        self.related_concepts = related_concepts
         self.adversarial_intervention = adversarial_intervention
+        self.vae_model = vae_model
         for i in range(n_concepts):
             if embeding_activation is None:
                 self.concept_context_generators.append(
@@ -258,7 +261,10 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         intervention_idxs=None,
         c_true=None,
         train=False,
+        related_concepts=None,
+        vae_model=None,
     ):
+                
         if train and (self.training_intervention_prob != 0) and (
             intervention_idxs is None
         ):
@@ -267,8 +273,29 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             intervention_idxs = torch.nonzero(mask).reshape(-1)
         if (c_true is None) or (intervention_idxs is None):
             return prob
-        if concept_idx not in intervention_idxs:
+        if concept_idx not in intervention_idxs and related_concepts == None:
             return prob
+        elif concept_idx not in intervention_idxs and related_concepts != None and concept_idx in related_concepts:
+            if any(key in intervention_idxs for key in related_concepts[concept_idx].keys()):
+                full_prob = 0
+                for reference_concept in related_concepts[concept_idx]: 
+                    function, confidence = related_concepts[concept_idx][reference_concept]
+                    true_concept_value = function(c_true[:,reference_concept:reference_concept+1])
+                    full_prob +=  (
+                        (
+                           true_concept_value *
+                            self.active_intervention_values[concept_idx]
+                        ) +
+                        (
+                            (true_concept_value  - 1) *
+                            -self.inactive_intervention_values[concept_idx]
+                        )
+                    )
+
+                full_prob /= len(related_concepts[concept_idx].keys())
+                prob = full_prob * confidence + (1-confidence)*prob
+            return prob
+            
         c_true = self._switch_concepts(c_true)
         if self.sigmoidal_prob:
             return c_true[:, concept_idx:concept_idx+1]
@@ -284,7 +311,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         )
         return result
     
-    def _forward(self, x, intervention_idxs=None, c=None, train=False):
+    def _forward(self, x, intervention_idxs=None, c=None, train=False,related_concepts=None,vae_model=None):
         pre_c = self.pre_concept_model(x)
         probs = []
         full_vectors = []
@@ -311,6 +338,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 intervention_idxs=intervention_idxs,
                 c_true=c,
                 train=train,
+                related_concepts=related_concepts
             )
             probs.append(prob)
             # Then time to mix!
@@ -320,7 +348,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             all_contexts.append(context)
             
             # Write which concepts were used to compute outputs
-            if not train:
+            if not train and c != None and related_concepts == None:
                 self.update_concepts(context,self.emb_size,c,i)
             else:
                 # Reset concepts for the next run
@@ -340,23 +368,42 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 full_vectors.append(context)
         c_sem = torch.cat(sem_probs, axis=-1)
         c_pred = torch.cat(full_vectors, axis=-1)
+        
+        if vae_model is not None:
+            print(c_pred.shape)
+            encoded_image = model.decoder.predict(c_pred.detach().numpy())
+            re_decoded_image = model.encoder.predict(encoded_image)
+            c_pred = torch.Tensor(re_decoded_image)
+
         y = self.c2y_model(c_pred)
         
         sizes = [i.size() for i in all_contexts]
         
         contexts = torch.stack(all_contexts)
+                
         return c_sem, c_pred, y, contexts
 
     def _run_step(self, batch, batch_idx, train=False):
         x, y, c = self._unpack_batch(batch)
         y = y.long()
         if self.intervention_idxs is not None:
-            c_sem, c_logits, y_logits,context = self._forward(
-                x,
-                intervention_idxs=self.intervention_idxs,
-                c=c,
-                train=train,
-            )
+            if self.related_concepts is not None or self.vae_model is not None:
+                c_sem, c_logits, y_logits,context = self._forward(
+                    x,
+                    intervention_idxs=self.intervention_idxs,
+                    c=c,
+                    train=train,
+                    related_concepts=self.related_concepts,
+                    vae_model=self.vae_model
+                )
+            else:
+                c_sem, c_logits, y_logits,context = self._forward(
+                    x,
+                    intervention_idxs=self.intervention_idxs,
+                    c=c,
+                    train=train,
+                )
+            
         else:
             c_sem, c_logits, y_logits,context = self._forward(x, c=c, train=train)
             
