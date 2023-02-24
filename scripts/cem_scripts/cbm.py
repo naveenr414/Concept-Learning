@@ -107,6 +107,7 @@ class ConceptBottleneckModel(pl.LightningModule):
         bottleneck_nonlinear=None,
         adversarial_intervention=False,
         c2y_layers=None,
+        vae_model=None,
         active_intervention_values=None,
         inactive_intervention_values=None,
         gpu=int(torch.cuda.is_available()),
@@ -210,6 +211,7 @@ class ConceptBottleneckModel(pl.LightningModule):
         self.extra_dims = extra_dims
         self.top_k_accuracy = top_k_accuracy
         self.n_tasks = n_tasks
+        self.vae_model = vae_model
         self.intervention_idxs = intervention_idxs
         self.adversarial_intervention = adversarial_intervention
         self.sigmoidal_prob = sigmoidal_prob
@@ -236,6 +238,15 @@ class ConceptBottleneckModel(pl.LightningModule):
     ):
         if (c_true is None) or (intervention_idxs is None):
             return c_pred
+        
+        # Ours: Intervene with VAE models 
+        if self.vae_model != None:
+            temp_c = self.vae_model.decoder.predict(c_pred.detach().numpy())
+            c_pred = torch.Tensor(self.vae_model.encoder.predict(temp_c))[2]
+            
+            if torch.cuda.is_available():
+                c_pred = c_pred.cuda()
+        
         c_true = self._switch_concepts(c_true)
         c_pred_copy = c_pred.clone()
         if self.sigmoidal_prob:

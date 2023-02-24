@@ -129,7 +129,7 @@ def generate_data_loaders_cub(suffix):
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
             'CUB{}/images/CUB_200_2011/'.format(suffix),
-            '')
+            ''),
     )
     
     valid_dl = load_data(
@@ -145,7 +145,7 @@ def generate_data_loaders_cub(suffix):
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
             'CUB{}/images/CUB_200_2011/'.format(suffix),
-            '')
+            ''),
     )
     
     test_dl = load_data(
@@ -161,7 +161,7 @@ def generate_data_loaders_cub(suffix):
         num_workers=num_workers,
         path_transform=lambda path:path.replace(
             'CUB{}/images/CUB_200_2011/'.format(suffix),
-            '')
+            ''),
     )
     
     return train_dl, valid_dl, test_dl
@@ -323,7 +323,7 @@ if __name__ == "__main__":
         extractor_arch = c_extractor_arch
         imbalance = None
     elif experiment_name == "cub":
-        extractor_arch = resnet34
+        extractor_arch = "resnet34"
         cub_location = 'CUB{}'.format(suffix)
         train_data_path = cub_location+'/preprocessed/train.pkl'
         imbalance = find_class_imbalance(train_data_path, True)
@@ -360,19 +360,18 @@ if __name__ == "__main__":
         embeding_activation=None,
         concat_prob=False,
         seed=seed,
-        concept_pair_loss_weight = 0,
+        concept_pair_loss_weight = args.concept_pair_loss_weight,
         existing_weights=""
     )
     config["architecture"] = "ConceptEmbeddingModel"
-    config["extra_name"] = f"Uncertain"
+    config["extra_name"] = f"New"
     config["shared_prob_gen"] = True
     config["sigmoidal_prob"] = True
     config["sigmoidal_embedding"] = False
     config['training_intervention_prob'] = 0.25 
     config['concat_prob'] = False
     config['emb_size'] = config['emb_size']
-    config["embeding_activation"] = "leakyrelu"
-    
+    config["embeding_activation"] = "leakyrelu"    
     
     training.train_model(
         n_concepts=n_concepts,
