@@ -2,7 +2,7 @@ import tcav
 import numpy as np
 import tcav.activation_generator as act_gen
 import tcav.cav as cav
-import tcav.model  as model
+import tcav.model as model
 import tcav.tcav as tcav
 import tcav.utils as utils
 import glob
@@ -27,7 +27,7 @@ class VGGWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
         return np.array([224,224,3])
 
-def load_cem_vectors(experiment_name,concept_number,seed=-1,loss=False):
+def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="results/cem_concepts"):
     """Load all the 'active' embeddings from Concept Embedding Models
     
     Arguments:
@@ -40,10 +40,6 @@ def load_cem_vectors(experiment_name,concept_number,seed=-1,loss=False):
     Returns:
         Numpy array of size (k,n), where k = number of concept vectors, and n = size of embedding
     """
-    dataset_location = "results/cem_concepts"
-    if loss:
-        dataset_location+="_loss"
-    
     if seed == -1:
         all_seeds = get_seed_numbers(dataset_location+"/"+experiment_name)
         if len(all_seeds) == 0:
@@ -558,7 +554,7 @@ def load_cem_loss_vectors_simple(attribute,dataset,suffix,seed=-1):
     
     all_attributes = dataset.get_attributes()
     attribute_index = all_attributes.index(attribute)
-    return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed,loss=True)
+    return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed,dataset_location="results/cem_concepts_loss")
 
 
 def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):

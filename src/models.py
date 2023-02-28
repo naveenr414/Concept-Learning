@@ -193,7 +193,7 @@ def create_skipgram_architecture(embedding_dimension,vocab_size,initial_embeddin
     
     return SkipGram
 
-def resize_cub(images):
+def resize_cub(images,size=64):
     """Function to resize CUB images to 64x64 for the VAE
     
     Arguments:
@@ -202,7 +202,7 @@ def resize_cub(images):
     Returns: numpy array of the resized images
     """
     
-    return np.array([tf.image.resize(i,(64,64)) for i in images])
+    return np.array([tf.image.resize(i,(size,size)) for i in images])
 
 def train_VAE(dataset,suffix,seed,save_location="", latent_dim=2,epochs=30,concept_alignment=False):
     """Train a VAE model on some dataset, such as MNIST
