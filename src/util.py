@@ -458,3 +458,54 @@ def file_to_numpy(file_name):
     """
     
     return np.array(Image.open(file_name)).astype("float32")/255
+
+def delete_previous_activations(bottleneck,attribute_list):
+    """Delete all the previous activations so we can generate them 
+    
+    Arguments:
+        bottleneck: String, such as mixed4c
+        attribute_list: List of concepts which we want to delete and reset
+        
+    Returns: Nothing
+
+    Side Effects: Deletes all files in activation_dirs corresponding to attributes in attribute_list
+    """
+    
+    activation_dir = './results/activations'
+    
+    for concept in attribute_list:
+        activation_file_location = "{}/acts_{}_{}".format(activation_dir,concept,bottleneck)
+        if os.path.exists(activation_file_location):
+            os.remove(activation_file_location)
+
+def resize_cub(images,size=64):
+    """Function to resize CUB images to 64x64 for the VAE
+    
+    Arguments:
+        images: Numpy array of images that will be resized
+        
+    Returns: numpy array of the resized images
+    """
+    
+    return np.array([tf.image.resize(i,(size,size)) for i in images])
+            
+def contribution_score(concepts,predictions,concept_num,prediction_num):
+    """Given a concept and class we're trying to predict
+        Get the impact of that concept on the classes logit
+        
+    Arguments:
+        concepts: Numpy array of 0-1 concepts (nxk)
+        prediction: Predicted logits for each data point (nxm)
+        concept_num: Which concept number we're looking at (<k)
+        prediciton: Which predicted class we're looking at (<m)
+        
+    Returns: Float for the Shapley contribution
+    """
+    
+    positive_concept_indices = concepts[:,concept_num] == 1
+    negative_concept_indices = concepts[:,concept_num] == 0
+    
+    logit_values = predictions[positive_concept_indices][:,prediction_num]
+    logit_values_without = predictions[negative_concept_indices][:,prediction_num]
+        
+    return np.mean(logit_values)-np.mean(logit_values_without)

@@ -1,6 +1,7 @@
 from src.hierarchy import *
 from src.concept_vectors import *
 from src.dataset import *
+from src.models import *
 import numpy as np
 import itertools
 from scipy import stats
@@ -8,6 +9,7 @@ import tcav.utils as utils
 from scipy.spatial.distance import cdist
 import scipy
 import time
+import pandas as pd
 
 def get_top_k_pairs(embedding,k=3):
     pairs = []
@@ -187,6 +189,29 @@ def reset_dataset(dataset,seed,max_images):
         if os.path.exists(activation_file_location):
             os.remove(activation_file_location)
 
+def find_similar_conepts_shapley(concept,dataset,similarities,num_similar_concepts):
+    """Find the num_similar_concepts most similar concepts, ranked by their similarity in 
+    some layer of the Neural Network 
+    
+    Arguments:
+        concept: Baseline concept for which we're trying to find the K most similar concepts
+        dataset: String, such as 'mnist'
+        similariteis: Numpy matrix with similarities 
+        similar_concepts: How many similar concepts we should find 
+
+    Returns:
+        List, ordering the concepts from closest to furthest
+    """
+    
+    attributes = dataset.get_attributes()
+    concept_idx = attributes.index(concept)
+    
+    all_similarities = [(attributes[i],similarities[concept_idx][i]) for i in range(len(similarities)) if attributes[i] != concept]
+    all_similarities = sorted(all_similarities,reverse=True,key=lambda k: k[1])[:num_similar_concepts]
+    
+    return [i[0] for i in all_similarities]
+
+            
 def find_similar_concepts(concept,dataset,activations,num_similar_concepts,seed,metric='cosine'):
     """Find the num_similar_concepts most similar concepts, ranked by their similarity in 
     some layer of the Neural Network 
@@ -200,11 +225,7 @@ def find_similar_concepts(concept,dataset,activations,num_similar_concepts,seed,
     Returns:
         List, ordering the concepts from closest to furthest
     """
-    
-    activation_dir = './results/activations'
-    working_dir = './results/tmp'
-    image_dir = "./dataset/images"
-        
+            
     concepts = dataset.get_attributes()
                 
     our_vectors = activations[concept]
@@ -245,6 +266,101 @@ def rank_distance_concepts(embedding_method,dataset,concept,co_occuring_concepts
 
     metric_concept_pairs = sorted(metric_concept_pairs, key=lambda k: k[1])
     return [i[0] for i in metric_concept_pairs]
+
+
+
+def get_model_concept_similarities(dataset,model):
+    """Given a dataet + Keras model, run the model over the validation and get 
+        similarities between concepts via Shapley method
+
+    Arguments:
+        dataset: Object from dataset class
+        model: Keras model
+        
+    Returns: Numpy square matrix of similarities between concepts
+
+    """
+    datagen = ImageDataGenerator(rescale=1./255)
+    batch_size = 32
+    image_size = (224, 224)
+    
+    num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
+    num_attributes = len(dataset.get_data()[0]['attribute_label'])
+    
+    data_valid = dataset.get_data(train=False)
+    img_paths_valid = ['dataset/'+i['img_path'] for i in data_valid]
+    labels_valid = [str(i['class_label']) for i in data_valid]
+    valid_df = pd.DataFrame(zip(img_paths_valid,labels_valid), columns=["image_path", "label"])
+
+    valid_generator = datagen.flow_from_dataframe(dataframe=valid_df,
+                                              x_col="image_path",
+                                              y_col="label",
+                                              target_size=image_size,
+                                              batch_size=batch_size,
+                                              class_mode="categorical",
+                                              shuffle=True)
+    
+    predictions = model.predict(valid_generator)
+
+    concepts = np.array([i['attribute_label'] for i in data_valid])
+    contribution_array = np.array([[contribution_score(concepts,predictions,concept_num,class_num) for class_num in range(num_classes)]  for concept_num in range(num_attributes)])
+    
+    dist_array = cdist(contribution_array, contribution_array, metric='cosine')
+    
+    similarity_array = 1-dist_array
+    
+    return similarity_array
+    
+    
+def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds,model_name="VGG16",baseline_hierarchies=None):
+    """Compute the truthfulness metric using a Shapley-like approach, given a hierarchy+embedding method
+
+    Arguments: 
+        embedding_method: A simplified embedding creation method, such as load_cem_vectors_simple; 
+            Simply loads embeddings, does not train them from scratch 
+        dataset: Object from the dataset class
+        attributes: List of attributes we want to create embeddings for
+        random_seeds: List of numbers representing the random seed for the embeddings
+
+    Returns:
+        Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
+    """
+    
+    n_concepts = 5
+    compare_concepts = 5   
+    num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
+    
+    avg_truthfulness = []
+    
+    model = get_large_image_model(dataset,model_name)
+    model.load_weights("results/models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name))
+    
+    similarity_matrix = get_model_concept_similarities(dataset,model)
+    
+    for seed in random_seeds:  
+        random.seed(seed)
+        np.random.seed(seed)
+
+        selected_concepts = random.sample(attributes,k=n_concepts)
+        selected_concepts_indices = [attributes.index(i) for i in selected_concepts]
+        
+        temp_truthfulness = []
+        
+        for concept in selected_concepts:
+            co_occuring_concepts = find_similar_conepts_shapley(concept,dataset,similarity_matrix,compare_concepts)
+            co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
+                                                                    co_occuring_concepts,seed)
+            
+            if len(co_occuring_concepts) == 1:
+                temp_truthfulness.append(int(co_occuring_concepts == co_occuring_concepts_hierarchy))
+            else:
+                temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
+                                                         co_occuring_concepts_hierarchy).correlation)
+            
+        avg_truthfulness.append(np.mean(temp_truthfulness))
+            
+        
+    return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
 def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="VGG16",baseline_hierarchies=None):
     """Compute the truthfulness metric for a set of random seeds, given a hierarchy+embedding method
@@ -316,7 +432,7 @@ def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="
         results[name] = score
     
     if eval_truthfulness:
-        results['Truthfulness'] = truthfulness_metric(embedding_method,
+        results['Truthfulness'] = truthfulness_metric_shapley(embedding_method,
                         dataset,
                         attributes,
                         random_seeds,
@@ -385,6 +501,3 @@ if __name__ == "__main__":
     for key in sorted(list(results.keys())):
         w.write("{}: {}\n".format(key,results[key]))
     w.close()
-    
-    
-            
