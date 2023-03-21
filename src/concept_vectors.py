@@ -20,13 +20,6 @@ import time
 from sklearn.decomposition import PCA
 import pandas as pd 
 
-class ResnetWrapper(model.KerasModelWrapper):
-    def get_image_shape(self):
-        return np.array([224,224,3])
-    
-class VGGWrapper(model.KerasModelWrapper):
-    def get_image_shape(self):
-        return np.array([224,224,3])
 
 def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="results/cem_concepts"):
     """Load all the 'active' embeddings from Concept Embedding Models
@@ -114,6 +107,28 @@ def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
     """
         
     return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed)[0]
+
+def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
+    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
+        This produces a 0-1 vector, with the vector <0,1,0> representing
+        the presence of the attribute in data point 1, and not present in datapoints 0, 2
+        
+    Arguments:
+        attribute_name: String representing one of the attributes
+        dataset: Object from the Dataset class
+
+    Returns:
+        concept_vector: Numpy vector representing the concept vector for the attribute
+    """
+        
+    all_attributes = dataset.get_attributes()
+    if attribute_name not in all_attributes:
+        raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
+    index = all_attributes.index(attribute_name)
+    
+    train_data = dataset.get_data(suffix=suffix,seed=seed)
+    concept_vector = [i['attribute_label'][index] for i in train_data]
+    return np.array(concept_vector).reshape((1,len(concept_vector)))
 
 def load_label_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
@@ -232,6 +247,9 @@ def load_model_vectors_simple(attribute,dataset,suffix,seed=-1):
     """
 
     return load_vector_from_folder("model_vectors")(attribute,dataset,suffix,seed=seed)
+    
+def load_random_vectors_simple(attribute,dataset,suffix,seed=-1):
+    return np.random.random((1,100))
     
 def load_vae_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Retrieve concept vectors based on a generative VAE model

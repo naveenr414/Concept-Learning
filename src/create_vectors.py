@@ -19,6 +19,15 @@ import keras
 import time
 from sklearn.decomposition import PCA
 import pandas as pd 
+import os
+
+class ResnetWrapper(model.KerasModelWrapper):
+    def get_image_shape(self):
+        return np.array([224,224,3])
+    
+class VGGWrapper(model.KerasModelWrapper):
+    def get_image_shape(self):
+        return np.array([224,224,3])
 
 def create_concept2vec(dataset,suffix,seed=-1,
                              embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None):
@@ -75,28 +84,6 @@ def create_concept2vec(dataset,suffix,seed=-1,
     
     np.save(open("{}/vectors.npy".format(destination_folder),"wb"),vectors)
     
-def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
-    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
-        This produces a 0-1 vector, with the vector <0,1,0> representing
-        the presence of the attribute in data point 1, and not present in datapoints 0, 2
-        
-    Arguments:
-        attribute_name: String representing one of the attributes
-        dataset: Object from the Dataset class
-
-    Returns:
-        concept_vector: Numpy vector representing the concept vector for the attribute
-    """
-        
-    all_attributes = dataset.get_attributes()
-    if attribute_name not in all_attributes:
-        raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
-    index = all_attributes.index(attribute_name)
-    
-    train_data = dataset.get_data(suffix=suffix,seed=seed)
-    concept_vector = [i['attribute_label'][index] for i in train_data]
-    return np.array(concept_vector).reshape((1,len(concept_vector)))
-
 def create_tcav_dataset(attribute_name,dataset,num_random_exp,
                         max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="VGG16",bottlenecks=["block4_conv1"]):
     """Helper function to create TCAV from Attribute
@@ -366,7 +353,7 @@ def create_shapley_vectors(attributes,dataset,suffix,seed=-1):
     
     Side Effects: Saves concpet vectors to results/shapley/seed/attribute.npy"""
 
-    data = dataset.get_data()
+    data = dataset.get_data(train=True)
     img_paths = ['dataset/'+i['img_path'] for i in data]
     labels = [str(i['class_label']) for i in data]
 
@@ -374,23 +361,26 @@ def create_shapley_vectors(attributes,dataset,suffix,seed=-1):
     num_classes = len(set(labels))
     
     concept_vectors = {}
-    model = get_large_image_model(dataset,"VGG16",saved=True)
+    model_name = "VGG16"
+    model = get_large_image_model(dataset,model_name)
+    model.load_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
+    
     datagen = ImageDataGenerator(rescale=1./255)
     batch_size = 32
     image_size = (224, 224)
     
-    train_df = pd.DataFrame(zip(img_paths,labels), columns=["image_path", "label"])
+    valid_df = pd.DataFrame(zip(img_paths,labels), columns=["image_path", "label"])
 
-    train_generator = datagen.flow_from_dataframe(dataframe=train_df,
+    valid_generator = datagen.flow_from_dataframe(dataframe=valid_df,
                                               x_col="image_path",
                                               y_col="label",
                                               target_size=image_size,
                                               batch_size=batch_size,
                                               class_mode="categorical",
-                                              shuffle=True)
+                                              shuffle=False)
     
-    predictions = model.predict(train_generator)
-
+    predictions = model.predict(valid_generator)
+    
     concepts = np.array([i['attribute_label'] for i in data[:len(predictions)]])
     contribution_array = np.array([[contribution_score(concepts,predictions,concept_num,class_num) 
                                     for class_num in range(num_classes)] for concept_num in range(num_attributes)])

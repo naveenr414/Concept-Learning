@@ -20,7 +20,7 @@ class Dataset:
         else:
             file_name = self.test_pkl_path.format(suffix)
         data = pickle.load(open(file_name,"rb"))
-
+                
         if seed > -1:
             random.seed(seed)
         random.shuffle(data)

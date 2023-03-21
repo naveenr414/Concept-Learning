@@ -10,6 +10,7 @@ from scipy.spatial.distance import cdist
 import scipy
 import time
 import pandas as pd
+from src.create_vectors import get_activations_dictionary
 
 def get_top_k_pairs(embedding,k=3):
     pairs = []
@@ -239,7 +240,7 @@ def find_similar_concepts(concept,dataset,activations,num_similar_concepts,seed,
     all_distance_pairs = sorted(all_distance_pairs,key=lambda k: k[1])
     return [i[0] for i in all_distance_pairs][:num_similar_concepts]
 
-def rank_distance_concepts(embedding_method,dataset,concept,co_occuring_concepts,seed,metric='cosine'):
+def rank_distance_concepts(all_concept_embeddings,dataset,concept,co_occuring_concepts,seed,metric='cosine'):
     """Order how close certain concepts are to a fixed concept, given an embedding method + seed
     
     Arguments:
@@ -254,11 +255,14 @@ def rank_distance_concepts(embedding_method,dataset,concept,co_occuring_concepts
         List, which ranks the elements of co_occuring_concepts from smallest to largest
     """
     
-    embedding_constant = embedding_method(concept,dataset,"",seed=seed)
+    attributes = dataset.get_attributes()
+    concept_const = attributes.index(concept)
+    
+    embedding_constant = all_concept_embeddings[concept_const]
     embedding_by_concept = {}
 
     for other_concept in co_occuring_concepts:
-        embedding_by_concept[other_concept] = embedding_method(other_concept,dataset,"",seed=seed)
+        embedding_by_concept[other_concept] =  all_concept_embeddings[attributes.index(other_concept)]
         
     metric_concept_pairs = [(other_concept,
                              np.mean(cdist(embedding_constant,embedding_by_concept[other_concept],metric=metric)))
@@ -298,12 +302,12 @@ def get_model_concept_similarities(dataset,model):
                                               target_size=image_size,
                                               batch_size=batch_size,
                                               class_mode="categorical",
-                                              shuffle=True)
+                                              shuffle=False)
     
     predictions = model.predict(valid_generator)
 
     concepts = np.array([i['attribute_label'] for i in data_valid])
-    contribution_array = np.array([[contribution_score(concepts,predictions,concept_num,class_num) for class_num in range(num_classes)]  for concept_num in range(num_attributes)])
+    contribution_array = np.array([[contribution_score(concepts,predictions,concept_num,class_num,metric=True) for class_num in range(num_classes)]  for concept_num in range(num_attributes)])    
     
     dist_array = cdist(contribution_array, contribution_array, metric='cosine')
     
@@ -326,36 +330,39 @@ def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds
         Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
     """
     
-    n_concepts = 5
     compare_concepts = 5   
     num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
     
     avg_truthfulness = []
     
     model = get_large_image_model(dataset,model_name)
-    model.load_weights("results/models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name))
+    model.load_weights("results/models/{}_models/{}_42.h5".format(model_name.lower(),dataset.experiment_name))
     
     similarity_matrix = get_model_concept_similarities(dataset,model)
     
     for seed in random_seeds:  
         random.seed(seed)
         np.random.seed(seed)
-
-        selected_concepts = random.sample(attributes,k=n_concepts)
-        selected_concepts_indices = [attributes.index(i) for i in selected_concepts]
         
         temp_truthfulness = []
         
-        for concept in selected_concepts:
+        all_concept_embeddings = np.array([embedding_method(i,dataset,"",seed=seed) for i in dataset.get_attributes()])
+        print("Computed all concept embeddings")
+        
+        for concept in dataset.get_attributes():
             co_occuring_concepts = find_similar_conepts_shapley(concept,dataset,similarity_matrix,compare_concepts)
-            co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
-                                                                    co_occuring_concepts,seed)
+            co_occuring_concepts_hierarchy = rank_distance_concepts(all_concept_embeddings,dataset,concept,
+                                                                    attributes,seed)[1:1+compare_concepts]
+            """
             
             if len(co_occuring_concepts) == 1:
                 temp_truthfulness.append(int(co_occuring_concepts == co_occuring_concepts_hierarchy))
             else:
                 temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
-                                                         co_occuring_concepts_hierarchy).correlation)
+                                                         co_occuring_concepts_hierarchy).correlation)"""
+            
+            intersection = set(co_occuring_concepts).intersection(set(co_occuring_concepts_hierarchy))
+            temp_truthfulness.append(len(intersection)/compare_concepts)
             
         avg_truthfulness.append(np.mean(temp_truthfulness))
             
@@ -397,20 +404,17 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
         np.random.seed(seed)
 
         selected_concepts = random.sample(attributes,k=n_concepts)
+        all_concept_embeddings = np.array([embedding_method(i,dataset,"",seed=seed) for i in dataset.get_attributes()])
         
         temp_truthfulness = []
         
         for concept in selected_concepts:
             co_occuring_concepts = find_similar_concepts(concept,dataset,activations,compare_concepts,seed)                        
-            co_occuring_concepts_hierarchy = rank_distance_concepts(embedding_method,dataset,concept,
-                                                                    co_occuring_concepts,seed)
+            co_occuring_concepts_hierarchy = rank_distance_concepts(all_concept_embeddings,dataset,concept,
+                                                                    attributes,seed)[1:1+compare_concepts]
             
-            if len(co_occuring_concepts) == 1:
-                temp_truthfulness.append(int(co_occuring_concepts == co_occuring_concepts_hierarchy))
-            else:
-                temp_truthfulness.append(stats.kendalltau(co_occuring_concepts,
-                                                         co_occuring_concepts_hierarchy).correlation)
-            
+            intersection = set(co_occuring_concepts).intersection(set(co_occuring_concepts_hierarchy))
+            temp_truthfulness.append(len(intersection)/compare_concepts)            
         avg_truthfulness.append(np.mean(temp_truthfulness))
             
         

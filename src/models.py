@@ -1,8 +1,11 @@
 import numpy as np
 from keras.models import Sequential, Model
-from keras.layers import Embedding, Reshape, Activation, Input
-from keras.layers import Dot
+from keras.layers import Embedding, Reshape, Activation, Input, Dense, Flatten, Dot
+from keras.optimizers import Adam
+from keras.models import Model
 from keras.utils import np_utils
+from keras.applications.vgg16 import VGG16
+from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.data_utils import get_file
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import skipgrams
@@ -14,12 +17,8 @@ from src.util import *
 import os
 import argparse
 from src.dataset import *
+import pandas as pd
 
-from keras.applications.vgg16 import VGG16
-from keras.preprocessing.image import ImageDataGenerator
-from keras.models import Model
-from keras.layers import Dense, Flatten
-from keras.optimizers import Adam
 
 
 class Sampling(layers.Layer):
@@ -277,7 +276,7 @@ def save_vae(model,dataset,suffix,seed,concept_alignment=False):
         file_name = "{}/{}.npy".format(folder_name,concept)
         np.save(open(file_name,"wb"),average_embedding_by_concept[concept])
     
-def get_large_image_model(dataset,model_name,saved=True):
+def get_large_image_model(dataset,model_name):
     """Create a VGG or other large image model, fine-tuned for our dataset
     
     Arguments:
@@ -288,7 +287,7 @@ def get_large_image_model(dataset,model_name,saved=True):
     """
 
     num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
-    if model_name == "VGG16":
+    if model_name.lower() == "vgg16":
         model_base = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
     else:
         raise Exception("{} model not implemented yet".format(model_name))
@@ -326,6 +325,8 @@ def train_large_image_model(dataset,model_name,suffix="",seed=42):
     datagen = ImageDataGenerator(rescale=1./255)
     batch_size = 32
     image_size = (224, 224)
+    
+    print("Seed {} suffix {}".format(seed,suffix))
 
     data = dataset.get_data(seed=seed,suffix=suffix)
     img_paths = ['dataset/'+i['img_path'] for i in data]
@@ -342,10 +343,12 @@ def train_large_image_model(dataset,model_name,suffix="",seed=42):
                                           batch_size=batch_size,
                                           class_mode="categorical",
                                           shuffle=True)
+    
+    print("Generated dataset, now training model")
 
     model.fit(train_generator,
        steps_per_epoch=len(train_generator),
-       epochs=10)
+       epochs=25)
 
     model.save_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
     
@@ -353,6 +356,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')
     parser.add_argument('--algorithm',type=str,
                         help='Which algorithm to use to generate concept vectors')
+    parser.add_argument('--suffix',type=str,help='Which subset of the dataset to use',
+                        default='none')
     parser.add_argument('--dataset', type=str,
                         help='Name of the dataset which we generate, such as mnist')
     parser.add_argument('--seed',type=int, default=42,
@@ -360,18 +365,21 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    if "mnist" in args.dataset.lower():
+    if args.dataset.lower() == "mnist":
         dataset = MNIST_Dataset()
-        suffix = args.dataset.lower().replace("mnist","")
-    elif "cub" in args.dataset.lower():
+    elif args.dataset.lower() == "cub":
         dataset = CUB_Dataset()
-        suffix = args.dataset.lower().replace("cub","")
     else:
         raise Exception("{} not implemented".format(args.dataset))
     
     seed = args.seed
+    suffix = args.suffix
+    if suffix == 'none':
+        suffix = '' 
     
     if args.algorithm == 'vae':
         train_VAE(dataset,suffix,seed,epochs=30,latent_dim=4)
     elif args.algorithm == 'vae_concept':
         train_VAE(dataset,suffix,seed,epochs=30,latent_dim=len(dataset.get_attributes()),concept_alignment=True)
+    elif args.algorithm == 'shapley':
+        train_large_image_model(dataset,'VGG16',suffix,seed=seed)

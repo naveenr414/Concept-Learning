@@ -6,6 +6,7 @@ from collections import defaultdict
 import random
 import tensorflow as tf
 from PIL import Image
+import os
 
 def create_distance_metric(vector_a,vector_b,metric):
     """Find the distance for every pair of vectors in vector_a and vector_b
@@ -489,7 +490,7 @@ def resize_cub(images,size=64):
     
     return np.array([tf.image.resize(i,(size,size)) for i in images])
             
-def contribution_score(concepts,predictions,concept_num,prediction_num):
+def contribution_score(concepts,predictions,concept_num,prediction_num,metric=False):
     """Given a concept and class we're trying to predict
         Get the impact of that concept on the classes logit
         
@@ -504,8 +505,12 @@ def contribution_score(concepts,predictions,concept_num,prediction_num):
     
     positive_concept_indices = concepts[:,concept_num] == 1
     negative_concept_indices = concepts[:,concept_num] == 0
-    
+        
     logit_values = predictions[positive_concept_indices][:,prediction_num]
     logit_values_without = predictions[negative_concept_indices][:,prediction_num]
-        
-    return np.mean(logit_values)-np.mean(logit_values_without)
+            
+    if metric:
+        return np.mean(logit_values)-np.mean(logit_values_without)
+    else:
+        return np.mean(logit_values)-np.mean(logit_values_without)
+    
