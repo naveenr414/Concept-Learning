@@ -306,6 +306,39 @@ def get_large_image_model(dataset,model_name):
               metrics=['accuracy'])
     return model
         
+def get_large_image_model_concept(dataset,model_name):
+    """Train a VGG model to predict concept values for a particular dataset
+    
+    Arguments:
+        dataset: Object from dataset class
+        model_name: String, such as 'VGG16'
+
+    Returns: Keras model
+    """
+    
+    num_attributes = len(dataset.get_data()[0]['attribute_label'])
+    input_shape = (224, 224, 3)
+    
+    input_tensor = Input(shape=input_shape)
+
+    if model_name == 'vgg16':
+        base_model = VGG16(weights='imagenet', include_top=False, input_tensor=input_tensor)
+    else:
+        raise Exception("{} model not implemented yet".format(model_name))
+        
+    for layer in base_model.layers:
+        layer.trainable = False
+
+    x = base_model.output
+    x = Flatten()(x)
+    x = Dense(512, activation='relu')(x)
+    output_layer = Dense(num_attributes, activation='sigmoid')(x)
+
+    model = Model(inputs=base_model.input, outputs=output_layer)
+    model.compile(optimizer=Adam(lr=1e-3), loss='binary_crossentropy', metrics=['mse'])
+    return model
+    
+    
 def train_large_image_model(dataset,model_name,suffix="",seed=42):
     """Train a VGG model to predict downstream task for some dataset
     

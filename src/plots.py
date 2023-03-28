@@ -5,6 +5,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 from collections import defaultdict
 from scipy.cluster.hierarchy import dendrogram
+from PIL import Image
 
 color_palette = ['#377eb8', '#ff7f00', '#4daf4a',
                   '#f781bf', '#a65628']
@@ -224,3 +225,18 @@ def plot_latent_space(vae, n=30, figsize=15,channels=3,coords=[0,1],latent_size=
     plt.imshow(figure)
     plt.show()
 
+def plot_image(file_path):
+    """Given a file_path, plot the image
+    
+    Arguments:
+        file_path: String, representing the path to an image
+        
+    Returns: Nothing
+    
+    Side Effects: Plots the image
+    """
+    
+    image = Image.open(file_path)
+    plt.imshow(image)
+    plt.grid(False)
+    plt.show()

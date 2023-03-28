@@ -23,7 +23,7 @@ class Dataset:
                 
         if seed > -1:
             random.seed(seed)
-        random.shuffle(data)
+            random.shuffle(data)
         return data
     
     def get_class_labels(self,seed=-1,suffix="",train=True):
@@ -143,6 +143,9 @@ class CUB_Dataset(Dataset):
         self.all_files = "dataset/CUB/images/CUB_200_2011/images/*/*.jpg"
         self.root_folder_name = "CUB"
         self.experiment_name = "cub"
+        
+        self.class_names = open("dataset/CUB/metadata/classes.txt").read().strip().split("\n")
+        self.class_names = [i.split(" ")[1] for i in self.class_names]
     
     def get_attributes(self):
         attributes_file = "dataset/CUB/metadata/attributes.txt"
