@@ -53,7 +53,11 @@ def stability_metric(embedding_method,dataset,attributes,random_seeds):
 
     distance_list = []
     for h1,h2 in itertools.combinations(baseline_embeddings,r=2):
-        distance = embedding_distance(h1,h2)
+        k = 3
+        
+        if dataset.experiment_name == 'mnist':
+            k = 1
+        distance = embedding_distance(h1,h2,k=k)
         distance_list.append(distance)
         
     return np.mean(distance_list), np.std(distance_list)
@@ -73,17 +77,17 @@ def compare_same_images_by_suffix(embedding_method,dataset,attributes,random_see
     Returns: 
         Float, representing average paired distance between hierarchies, and the standard deviation
     """
-    
-    if suffix not in ["","_image_robustness","_image_responsiveness","_model_robustness","_model_responsiveness"]:
-        raise Exception("{} suffix not supported".format(suffix))
-        
+            
     baseline_embeddings = [flat_distance_to_square(get_concept_distances
                                                    (embedding_method,dataset,"",attributes,seed)) for seed in random_seeds]
     robust_hierarchies = [flat_distance_to_square(get_concept_distances(embedding_method,dataset,suffix,attributes,seed)) for seed in random_seeds]
         
     distance_list = []
     for h1,h2 in zip(baseline_embeddings,robust_hierarchies):
-        distance_list.append(embedding_distance(h1,h2))
+        k = 3
+        if dataset.experiment_name == 'mnist':
+            k = 1
+        distance_list.append(embedding_distance(h1,h2,k=k))
                 
     return np.mean(distance_list), np.std(distance_list)
     
@@ -331,6 +335,11 @@ def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds
     """
     
     compare_concepts = 5   
+    
+    # For MNIST, only the closest concept matters
+    if dataset.experiment_name == "mnist":
+        compare_concepts = 1
+    
     num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
     
     avg_truthfulness = []
@@ -347,12 +356,14 @@ def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds
         temp_truthfulness = []
         
         all_concept_embeddings = np.array([embedding_method(i,dataset,"",seed=seed) for i in dataset.get_attributes()])
-        print("Computed all concept embeddings")
         
         for concept in dataset.get_attributes():
             co_occuring_concepts = find_similar_conepts_shapley(concept,dataset,similarity_matrix,compare_concepts)
             co_occuring_concepts_hierarchy = rank_distance_concepts(all_concept_embeddings,dataset,concept,
-                                                                    attributes,seed)[1:1+compare_concepts]
+                                                                    attributes,seed)[:1+compare_concepts]
+            co_occuring_concepts_hierarchy = [i for i in co_occuring_concepts_hierarchy if i!=concept]
+            co_occuring_concepts_hierarchy = co_occuring_concepts_hierarchy[:compare_concepts]
+            
             """
             
             if len(co_occuring_concepts) == 1:
@@ -421,10 +432,8 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
     return np.mean(avg_truthfulness), np.std(avg_truthfulness)
 
 def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16",eval_truthfulness=True):
-    metrics = [stability_metric, robustness_image_metric,responsiveness_image_metric,
-               robustness_model_metric,responsiveness_model_metric]
-    metric_names = ['Stability', 'Image Robustness', 'Image Responsiveness',
-                'Model Robustness','Model Responsiveness']
+    metrics = [stability_metric, robustness_image_metric,responsiveness_image_metric]
+    metric_names = ['Stability', 'Image Robustness', 'Image Responsiveness']
             
     results = {}
     for metric,name in zip(metrics,metric_names):
@@ -439,8 +448,8 @@ def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="
         results['Truthfulness'] = truthfulness_metric_shapley(embedding_method,
                         dataset,
                         attributes,
-                        random_seeds,
-                        model=model)
+                        random_seeds)
+        print("{}: {}".format("Truthfulness",results['Truthfulness']))
         
     return results
 

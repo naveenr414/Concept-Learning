@@ -68,6 +68,9 @@ def create_concept2vec(dataset,suffix,seed=-1,
         # Collect the dataset
         for i, doc in enumerate(all_data):
             formatted_data = [attributes[j] for j,indicator in enumerate(doc['attribute_label']) if indicator == 1]
+            
+            if len(formatted_data) == 0:
+                continue
             data, labels = generate_skipgram_dataset(formatted_data,attributes,8,8)   
             
             data = np.array(data,dtype=np.int32)
@@ -298,7 +301,7 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
         mytcav.params = mytcav.get_params()
 
         mytcav.run(run_parallel=False)
-        
+        delete_previous_activations(bottlenecks[0],concepts)
 def create_model_vectors(attributes,dataset,suffix,seed=-1):
     """Develop concept vectors based on a model representation
     
@@ -340,7 +343,7 @@ def create_model_vectors(attributes,dataset,suffix,seed=-1):
         save_file = "results/model_vectors/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute)
         np.save(open(save_file,"wb"),activations[attribute])
 
-def create_shapley_vectors(attributes,dataset,suffix,seed=-1):
+def create_shapley_vectors(attributes,dataset,suffix,seed=-1,model_name="VGG16",noise_std=0,label_flip=0):
     """Develop concept vectors based on shapley impact on logits
     
     Arguments:
@@ -353,17 +356,48 @@ def create_shapley_vectors(attributes,dataset,suffix,seed=-1):
     
     Side Effects: Saves concpet vectors to results/shapley/seed/attribute.npy"""
 
-    data = dataset.get_data(train=True)
+    data = dataset.get_data(train=True, seed=seed)
+    
+    if label_flip != 0:
+        assert suffix == ""
+        flip_concept_labels(data,label_flip,lambda path, suffix: path,"")
+
+    
+    # For MNIST, use only the first 5%
+    if dataset.experiment_name == "mnist":
+        data = data[:len(data)//20]
+    
     img_paths = ['dataset/'+i['img_path'] for i in data]
     labels = [str(i['class_label']) for i in data]
 
     num_attributes = len(attributes)
     num_classes = len(set(labels))
     
+    # For dsprites, not all classes are used, but there are 100 classes
+    if dataset.experiment_name == "dsprites":
+        num_classes = 100
+    
     concept_vectors = {}
-    model_name = "VGG16"
     model = get_large_image_model(dataset,model_name)
-    model.load_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
+    
+    if noise_std != 0:
+        assert suffix == ""
+        model.load_weights("results/models/{}_models/{}_noise_{}_{}.h5".format(
+            model_name.lower(),dataset.experiment_name+suffix,noise_std,seed))
+    else:
+        model.load_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
+    
+        
+    if noise_std != 0:
+        directory = "results/shapley/{}_noise_{}/{}".format(dataset.experiment_name+suffix,noise_std,seed)
+    elif label_flip != 0:
+        directory = "results/shapley/{}_flip_{}/{}".format(dataset.experiment_name+suffix,label_flip,seed)
+    elif model_name != "VGG16":
+        directory = "results/shapley/{}_model_{}/{}".format(dataset.experiment_name+suffix,model_name.lower(),seed)
+    else:
+        directory = "results/shapley/{}/{}".format(dataset.experiment_name+suffix,seed)
+        
+    print("Using directory {}".format(directory))
     
     datagen = ImageDataGenerator(rescale=1./255)
     batch_size = 32
@@ -382,17 +416,22 @@ def create_shapley_vectors(attributes,dataset,suffix,seed=-1):
     predictions = model.predict(valid_generator)
     
     concepts = np.array([i['attribute_label'] for i in data[:len(predictions)]])
+    
     contribution_array = np.array([[contribution_score(concepts,predictions,concept_num,class_num) 
                                     for class_num in range(num_classes)] for concept_num in range(num_attributes)])
     
-    for i in range(len(attributes)):
-        concept_vectors[attributes[i]] = contribution_array[i].reshape((1,num_classes))
     
-    if not os.path.exists("results/shapley/{}/{}".format(dataset.experiment_name+suffix,seed)):
-        os.makedirs("results/shapley/{}/{}".format(dataset.experiment_name+suffix,seed))
+    for i in range(len(attributes)):
+        if True in np.isnan(contribution_array[i]):
+            contribution_array[i] = np.zeros((1,num_classes))
+        
+        concept_vectors[attributes[i]] = contribution_array[i].reshape((1,num_classes))    
+                                               
+    if not os.path.exists(directory):
+        os.makedirs(directory)
         
     for attribute in attributes:
-        save_file = "results/shapley/{}/{}/{}.npy".format(dataset.experiment_name+suffix,seed,attribute)
+        save_file = "{}/{}.npy".format(directory,attribute)
         np.save(open(save_file,"wb"),concept_vectors[attribute])
         
 if __name__ == "__main__":
@@ -432,13 +471,17 @@ if __name__ == "__main__":
     else:
         args.suffix = '_'+args.suffix
         
-    if args.dataset not in ['xor','mnist','imagenet','cub']:
+    if args.dataset not in ['xor','mnist','imagenet','cub','dsprites','chexpert']:
         raise Exception("{} dataset not supported".format(args.dataset))
         
     if args.dataset == 'mnist':
         dataset = MNIST_Dataset()
     elif args.dataset == 'cub':
         dataset = CUB_Dataset()
+    elif args.dataset == 'dsprites':
+        dataset = DSprites_Dataset()
+    elif args.dataset == 'chexpert':
+        dataset = Chexpert_Dataset()
         
     if args.algorithm == 'tcav':
         if args.dataset == 'imagenet':

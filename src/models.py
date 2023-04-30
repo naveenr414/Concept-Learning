@@ -5,6 +5,8 @@ from keras.optimizers import Adam
 from keras.models import Model
 from keras.utils import np_utils
 from keras.applications.vgg16 import VGG16
+from keras.applications import ResNet50
+from keras.applications import InceptionV3
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils.data_utils import get_file
 from keras.preprocessing.text import Tokenizer
@@ -18,8 +20,8 @@ import os
 import argparse
 from src.dataset import *
 import pandas as pd
-
-
+from tensorflow.keras.applications.resnet50 import preprocess_input
+from sklearn.preprocessing import OneHotEncoder
 
 class Sampling(layers.Layer):
     """Uses (z_mean, z_log_var) to sample z, the vector encoding a digit."""
@@ -287,8 +289,16 @@ def get_large_image_model(dataset,model_name):
     """
 
     num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
+    
+    if dataset.experiment_name == 'dsprites':
+        num_classes = 100
+    
     if model_name.lower() == "vgg16":
         model_base = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+    elif model_name.lower() == "resnet50":
+        model_base = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3))
+    elif model_name.lower() == "inceptionv3":
+        model_base = InceptionV3(weights='imagenet', include_top=False, input_shape=(224,224,3))
     else:
         raise Exception("{} model not implemented yet".format(model_name))
 
@@ -339,7 +349,7 @@ def get_large_image_model_concept(dataset,model_name):
     return model
     
     
-def train_large_image_model(dataset,model_name,suffix="",seed=42):
+def train_large_image_model(dataset,model_name,suffix="",seed=42,noise_std=0):
     """Train a VGG model to predict downstream task for some dataset
     
     Arguments:
@@ -354,36 +364,65 @@ def train_large_image_model(dataset,model_name,suffix="",seed=42):
     """
     
     model = get_large_image_model(dataset,model_name)
-    
-    datagen = ImageDataGenerator(rescale=1./255)
+  
+    if model_name == "resnet50":
+        datagen = ImageDataGenerator(preprocessing_function=preprocess_input)
+    else:
+        if noise_std != 0:
+            datagen = ImageDataGenerator(rescale=1./255,preprocessing_function=lambda img: add_gaussian_noise(img,0,noise_std).astype('float64'))
+        else:
+            datagen = ImageDataGenerator(rescale=1./255)
+            
     batch_size = 32
     image_size = (224, 224)
     
     print("Seed {} suffix {}".format(seed,suffix))
 
     data = dataset.get_data(seed=seed,suffix=suffix)
+    
+    # For MNIST, we sample only 5% of the data due to time constraints 
+    if dataset.experiment_name == "mnist":
+        data = data[:len(data)//20]
+    
     img_paths = ['dataset/'+i['img_path'] for i in data]
     labels = [str(i['class_label']) for i in data]
     train_df = pd.DataFrame(zip(img_paths,labels), columns=["image_path", "label"])
-
+    
     np.random.seed(seed)
     random.seed(seed)
     
-    train_generator = datagen.flow_from_dataframe(dataframe=train_df,
-                                          x_col="image_path",
-                                          y_col="label",
-                                          target_size=image_size,
-                                          batch_size=batch_size,
-                                          class_mode="categorical",
-                                          shuffle=True)
+    if dataset.experiment_name == "dsprites":
+        train_generator = datagen.flow_from_dataframe(dataframe=train_df,
+                                              x_col="image_path",
+                                              y_col="label",
+                                              target_size=image_size,
+                                              batch_size=batch_size,
+                                              class_mode="categorical",
+                                              shuffle=True,
+                                             classes=[str(i) for i in range(100)])
+    else:
+        train_generator = datagen.flow_from_dataframe(dataframe=train_df,
+                                              x_col="image_path",
+                                              y_col="label",
+                                              target_size=image_size,
+                                              batch_size=batch_size,
+                                              class_mode="categorical",
+                                              shuffle=True)
     
     print("Generated dataset, now training model")
+    print("Train generator {}".format(len(train_generator)))
+    print(len(train_df))
+    print(train_df['image_path'][0])
 
     model.fit(train_generator,
        steps_per_epoch=len(train_generator),
        epochs=25)
-
-    model.save_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
+    
+    if noise_std != 0:
+        model.save_weights("results/models/{}_models/{}_noise_{}_{}.h5".format(
+            model_name.lower(),dataset.experiment_name+suffix,noise_std,seed))
+    else:
+        model.save_weights("results/models/{}_models/{}_{}.h5".format(model_name.lower(),dataset.experiment_name+suffix,seed))
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate concept vectors based on ImageNet Classes')

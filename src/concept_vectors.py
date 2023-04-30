@@ -42,6 +42,9 @@ def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="re
         seed = random.choice(all_seeds)
     
     file_location = dataset_location + "/{}/{}".format(experiment_name,seed)
+    
+    if 'chexpert' in experiment_name or 'dsprites' in experiment_name:
+        experiment_name = experiment_name.split("_")[0]
     file_location+="/{}_concept_{}_active.npy".format(experiment_name,concept_number)
     return np.load(open(file_location,"rb"))
 
@@ -69,13 +72,17 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     all_matching_files = [] 
     concept_meta_info = []
     
+    
     for bottleneck in bottlenecks:
         for alpha in alphas:
             file_name_pattern = "{}-random*-{}-linear-{}.pkl".format(concept,bottleneck,alpha)
             all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
+            if len(all_matching_files) == 0:
+                print(concept)
                                         
             for file_name in all_matching_files:
-                re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(concept,bottleneck,alpha),file_name)
+                temp_concept = concept.replace("(","\(").replace(")","\)")
+                re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,bottleneck,alpha),file_name)
                 random_concept = re_search.group(1)
                 concept_meta_info.append({'alpha': alpha,'bottleneck':
                                           bottleneck, 'random_concept': int(random_concept), 'concept': concept})
@@ -160,8 +167,12 @@ def load_cem_vectors_simple(attribute,dataset,suffix,seed=-1):
     
     all_attributes = dataset.get_attributes()
     attribute_index = all_attributes.index(attribute)
-    return load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
-
+    cem_vectors = load_cem_vectors(dataset.experiment_name+suffix,attribute_index,seed)
+    if len(cem_vectors) != 0:
+        return cem_vectors
+    else:
+        return np.zeros((1,cem_vectors.shape[1]))
+    
 def load_cem_loss_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create vector from cub/mnist that is standardized across embeddings
     
@@ -350,4 +361,20 @@ def combine_embeddings_concatenate(f_one,f_two):
     
     return get_average_embedding
     
+def export_concept_vector(embedding_method,name,dataset,seeds):
+    """Export concept vectors into a numpy file for use with the CEM intervention experiments
     
+    Arguments:
+        embedding_method: Function such as load_label_vectors_simple
+        name: String representing the name of the method, used to name the output file
+        dataset: Object from the dataset class
+        seeds: List of numbers to loop over for the method
+
+    Returns: Nothing
+    
+    Side Effects: Writes a npy file for each seed to the results/temp folder
+    """
+    
+    for seed in seeds:
+        all_embeddings =  np.array([np.mean(embedding_method(i,dataset,"",seed=seed),axis=0) for i in dataset.get_attributes()])
+        np.save(open("results/temp/{}_{}.npy".format(name,seed),"wb"),all_embeddings)

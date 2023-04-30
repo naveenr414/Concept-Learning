@@ -420,7 +420,7 @@ def generate_negative_examples(concept_list,total_concepts, num_examples):
     return np.array(ret_array)
 
 def generate_skipgram_dataset(datapoint,all_concepts,num_positive,num_negative):
-    """Generate a skipgram set of datapoints from a single concept list, given a list of concepts
+    """ Generate a skipgram set of datapoints from a single concept list, given a list of concepts
     
     Arguments:
         datapoint: List of strings representing the presence of different concepts
