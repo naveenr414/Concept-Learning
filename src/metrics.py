@@ -320,7 +320,7 @@ def get_model_concept_similarities(dataset,model):
     return similarity_array
     
     
-def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds,model_name="VGG16",baseline_hierarchies=None):
+def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds,model_name="VGG16",baseline_hierarchies=None,compare_concepts=None):
     """Compute the truthfulness metric using a Shapley-like approach, given a hierarchy+embedding method
 
     Arguments: 
@@ -334,7 +334,8 @@ def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds
         Float, representing similarity between distances in the model, and the distances predicted by the hierarchy; it's an average correlation between 0-1, and the standard deviation
     """
     
-    compare_concepts = 5   
+    if compare_concepts == None:
+        compare_concepts = 5   
     
     # For MNIST, only the closest concept matters
     if dataset.experiment_name == "mnist":
