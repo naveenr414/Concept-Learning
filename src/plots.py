@@ -225,7 +225,7 @@ def plot_latent_space(vae, n=30, figsize=15,channels=3,coords=[0,1],latent_size=
     plt.imshow(figure)
     plt.show()
 
-def plot_image(file_path):
+def plot_image(file_path,resize=False):
     """Given a file_path, plot the image
     
     Arguments:
@@ -235,8 +235,10 @@ def plot_image(file_path):
     
     Side Effects: Plots the image
     """
-    
     image = Image.open(file_path)
+    
+    if resize:
+        image = image.resize((64,64))
     plt.imshow(image)
     plt.grid(False)
     plt.show()
