@@ -9,3 +9,5 @@ logs/
 *.pyc
 results/
 scripts/Figures/
+!results/evaluation
+!results/knn
