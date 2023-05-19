@@ -1,4 +1,4 @@
-dataset/
+dataset/*
 .ipynb_checkpoints
 *.egg-info
 src/__pycache__/
@@ -10,3 +10,9 @@ scripts/Figures/
 !results/
 !results/evaluation
 !results/knn
+!dataset
+!dataset/*
+dataset/*/images
+dataset/models/
+dataset/images
+!dataset/*/preprocessed
