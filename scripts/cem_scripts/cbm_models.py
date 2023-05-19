@@ -3,15 +3,15 @@ import torch
 from torch import nn
 import pytorch_lightning as pl
 import torch_geometric
-from torch_geometric.nn import MessagePassing
+from pytorch_lightning.callbacks import Callback
+# from torch_geometric.nn import MessagePassing
+# from torch_geometric.nn import global_mean_pool, global_max_pool, global_sort_pool, global_add_pool
+# from torch_scatter import scatter
+# from torch_geometric.nn import GATConv
+from torch.utils.data import TensorDataset, DataLoader
 import torch.nn.functional as F
 from torch.nn import Linear, ReLU, BatchNorm1d, Module, Sequential
-from torch_geometric.nn import global_mean_pool, global_max_pool, global_sort_pool, global_add_pool
-from torch_scatter import scatter
-from torch.utils.data import TensorDataset, DataLoader
 from copy import deepcopy
-from torch_geometric.nn import GATConv
-from pytorch_lightning.callbacks import Callback
 import secrets
 import wandb
 from pytorch_lightning.loggers import WandbLogger
@@ -167,209 +167,209 @@ class Decoder_CBM(pl.LightningModule):
         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.hyperparameters['epochs'])
         return [optimizer], [scheduler]
             
-class MPNNLayer(MessagePassing):
-    def __init__(self, emb_dim=1, edge_dim=1, aggr='add'):
-        super().__init__(aggr=aggr)
+# class MPNNLayer(MessagePassing):
+#     def __init__(self, emb_dim=1, edge_dim=1, aggr='add'):
+#         super().__init__(aggr=aggr)
 
-        self.emb_dim = emb_dim
-        self.edge_dim = edge_dim
-        self.mlp_msg = Sequential(
-            Linear(2*emb_dim + edge_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(),
-            Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
-          )
-        self.mlp_upd = Sequential(
-            Linear(2*emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(), 
-            Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
-          )
+#         self.emb_dim = emb_dim
+#         self.edge_dim = edge_dim
+#         self.mlp_msg = Sequential(
+#             Linear(2*emb_dim + edge_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(),
+#             Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
+#           )
+#         self.mlp_upd = Sequential(
+#             Linear(2*emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU(), 
+#             Linear(emb_dim, emb_dim), BatchNorm1d(emb_dim), ReLU()
+#           )
 
-    def forward(self, h, edge_index, edge_attr):
-        out = self.propagate(edge_index, h=h, edge_attr=edge_attr)
-        return out
+#     def forward(self, h, edge_index, edge_attr):
+#         out = self.propagate(edge_index, h=h, edge_attr=edge_attr)
+#         return out
 
-    def message(self, h_i, h_j, edge_attr):
-        """Args:
-            h_i: (num_edges, node_dimension) - destination node features, essentially h[edge_index[0]]
-            h_j: (num_edges, node_dimension) - source node features, essentially h[edge_index[1]]
-            edge_attr: (num_edges, edge_features) - edge features
-        """
-        msg = torch.cat([h_i, h_j, edge_attr], dim=-1)
+#     def message(self, h_i, h_j, edge_attr):
+#         """Args:
+#             h_i: (num_edges, node_dimension) - destination node features, essentially h[edge_index[0]]
+#             h_j: (num_edges, node_dimension) - source node features, essentially h[edge_index[1]]
+#             edge_attr: (num_edges, edge_features) - edge features
+#         """
+#         msg = torch.cat([h_i, h_j, edge_attr], dim=-1)
 
-        return self.mlp_msg(msg)
+#         return self.mlp_msg(msg)
     
-    def aggregate(self, inputs, index):
-        return scatter(inputs, index, dim=self.node_dim, reduce=self.aggr)
+#     def aggregate(self, inputs, index):
+#         return scatter(inputs, index, dim=self.node_dim, reduce=self.aggr)
     
-    def update(self, aggr_out, h):
-        upd_out = torch.cat([h, aggr_out], dim=-1)
-        return self.mlp_upd(upd_out) 
+#     def update(self, aggr_out, h):
+#         upd_out = torch.cat([h, aggr_out], dim=-1)
+#         return self.mlp_upd(upd_out) 
 
-    def __repr__(self) -> str:
-        return (f'{self.__class__.__name__}(emb_dim={self.emb_dim}, aggr={self.aggr})')
+#     def __repr__(self) -> str:
+#         return (f'{self.__class__.__name__}(emb_dim={self.emb_dim}, aggr={self.aggr})')
     
-class MPNNModel(Module):
-    def __init__(self, model_type, hyperparameters,use_wandb,pretrain=False):
-        super().__init__()
-        self.in_dim = hyperparameters['in_dim']
-        self.groups = hyperparameters['indexes']
-        self.emb_dim = hyperparameters['emb_dim']
-        self.edge_dim = hyperparameters['edge_dim']
-        self.out_dim = hyperparameters['out_dim'] 
-        self.num_layers = hyperparameters['num_layers']
-        self.model_type = model_type
-        self.num_groups = len(self.groups)
-        self.use_wandb = use_wandb
+# class MPNNModel(Module):
+#     def __init__(self, model_type, hyperparameters,use_wandb,pretrain=False):
+#         super().__init__()
+#         self.in_dim = hyperparameters['in_dim']
+#         self.groups = hyperparameters['indexes']
+#         self.emb_dim = hyperparameters['emb_dim']
+#         self.edge_dim = hyperparameters['edge_dim']
+#         self.out_dim = hyperparameters['out_dim'] 
+#         self.num_layers = hyperparameters['num_layers']
+#         self.model_type = model_type
+#         self.num_groups = len(self.groups)
+#         self.use_wandb = use_wandb
         
-        self.pretrain = pretrain
-        self.pretrain_output = Linear(self.emb_dim,1)
+#         self.pretrain = pretrain
+#         self.pretrain_output = Linear(self.emb_dim,1)
         
-        self.lin_in = Linear(self.in_dim, self.emb_dim)
+#         self.lin_in = Linear(self.in_dim, self.emb_dim)
         
-        self.convs = torch.nn.ModuleList()
-        for layer in range(self.num_layers):
-            if self.model_type == 'gnn_gat':
-                self.convs.append(GATConv(self.emb_dim, self.edge_dim))
-            else:
-                self.convs.append(MPNNLayer(self.emb_dim, self.edge_dim, aggr='add'))
+#         self.convs = torch.nn.ModuleList()
+#         for layer in range(self.num_layers):
+#             if self.model_type == 'gnn_gat':
+#                 self.convs.append(GATConv(self.emb_dim, self.edge_dim))
+#             else:
+#                 self.convs.append(MPNNLayer(self.emb_dim, self.edge_dim, aggr='add'))
                 
-        if self.model_type == 'gnn_bool':
-            self.branches = nn.ModuleList()
+#         if self.model_type == 'gnn_bool':
+#             self.branches = nn.ModuleList()
 
-            for i in self.groups:
-                self.branches.append(nn.Sequential(
-                    nn.Linear(len(i), 5),
-                    nn.ReLU(),
-                    nn.Linear(5, 5),
-                    nn.ReLU(),
-                    nn.Linear(5, self.in_dim),
-                    nn.Sigmoid()
-                ))
-        elif self.model_type == 'gnn_bool_cem':
-            self.branches = nn.ModuleList()
+#             for i in self.groups:
+#                 self.branches.append(nn.Sequential(
+#                     nn.Linear(len(i), 5),
+#                     nn.ReLU(),
+#                     nn.Linear(5, 5),
+#                     nn.ReLU(),
+#                     nn.Linear(5, self.in_dim),
+#                     nn.Sigmoid()
+#                 ))
+#         elif self.model_type == 'gnn_bool_cem':
+#             self.branches = nn.ModuleList()
 
-            for i in self.groups:
-                self.branches.append(nn.Sequential(
-                    nn.Linear(len(i)*16, 5),
-                    nn.ReLU(),
-                    nn.Linear(5, 5),
-                    nn.ReLU(),
-                    nn.Linear(5, self.in_dim),
-                    nn.Sigmoid()
-                ))
+#             for i in self.groups:
+#                 self.branches.append(nn.Sequential(
+#                     nn.Linear(len(i)*16, 5),
+#                     nn.ReLU(),
+#                     nn.Linear(5, 5),
+#                     nn.ReLU(),
+#                     nn.Linear(5, self.in_dim),
+#                     nn.Sigmoid()
+#                 ))
 
         
-        self.pool = global_mean_pool
+#         self.pool = global_mean_pool
         
-        self.group_pred = Linear(self.emb_dim,self.emb_dim)
-        self.whole_pred = Linear(self.emb_dim*self.num_groups,self.emb_dim)
-        self.lin_pred = Linear(self.emb_dim, self.out_dim)
-        self.dropout = nn.Dropout(p=0.5)
+#         self.group_pred = Linear(self.emb_dim,self.emb_dim)
+#         self.whole_pred = Linear(self.emb_dim*self.num_groups,self.emb_dim)
+#         self.lin_pred = Linear(self.emb_dim, self.out_dim)
+#         self.dropout = nn.Dropout(p=0.5)
         
-    def get_embeddings(self,data):
-        edge_index = data.edge_index
-        edge_attr = data.edge_attr
+#     def get_embeddings(self,data):
+#         edge_index = data.edge_index
+#         edge_attr = data.edge_attr
         
-        if self.model_type == 'gnn_bool_cem':
-            h, edge_attr, edge_index = self.get_h_bool(data,cem=True)
-        elif data.x.shape[1] == 16: # CEM Models 
-            h = data.x
-        elif self.model_type == 'gnn_bool':
-            h, edge_attr, edge_index = self.get_h_bool(data)            
-        else:
-            h = self.lin_in(data.x)
+#         if self.model_type == 'gnn_bool_cem':
+#             h, edge_attr, edge_index = self.get_h_bool(data,cem=True)
+#         elif data.x.shape[1] == 16: # CEM Models 
+#             h = data.x
+#         elif self.model_type == 'gnn_bool':
+#             h, edge_attr, edge_index = self.get_h_bool(data)            
+#         else:
+#             h = self.lin_in(data.x)
             
             
             
-        for conv in self.convs:
-            if self.model_type == 'gnn_gat':
-                h = conv(h, data.edge_index) + h
-            else:
-                h = conv(h, edge_index, edge_attr) + h
-        return h
+#         for conv in self.convs:
+#             if self.model_type == 'gnn_gat':
+#                 h = conv(h, data.edge_index) + h
+#             else:
+#                 h = conv(h, edge_index, edge_attr) + h
+#         return h
     
-    def get_h_bool(self,data,cem=False):
-        branch_outputs = []
-        clause_size = sum([len(i) for i in self.groups])
-        total_size = len(data.x)
+#     def get_h_bool(self,data,cem=False):
+#         branch_outputs = []
+#         clause_size = sum([len(i) for i in self.groups])
+#         total_size = len(data.x)
         
-        if cem:
-            clause_size *= 16
-            total_size *= 16
-            x = data.x.reshape((total_size//clause_size,clause_size//16,16))
-        else:
-            x = data.x.reshape((len(data.x)//clause_size,clause_size))
+#         if cem:
+#             clause_size *= 16
+#             total_size *= 16
+#             x = data.x.reshape((total_size//clause_size,clause_size//16,16))
+#         else:
+#             x = data.x.reshape((len(data.x)//clause_size,clause_size))
         
-        for i in range(len(self.groups)):
-            if cem:
-                inp = x[:,self.groups[i],:]
-                inp = inp.reshape((len(inp),len(self.groups[i])*inp.shape[2]))
-                branch_outputs.append(self.branches[i](inp))
-            else:
-                branch_outputs.append(self.branches[i](x[:, self.groups[i]]))
+#         for i in range(len(self.groups)):
+#             if cem:
+#                 inp = x[:,self.groups[i],:]
+#                 inp = inp.reshape((len(inp),len(self.groups[i])*inp.shape[2]))
+#                 branch_outputs.append(self.branches[i](inp))
+#             else:
+#                 branch_outputs.append(self.branches[i](x[:, self.groups[i]]))
             
-        h = torch.stack((branch_outputs), dim=1)
-        h = h.view(-1, h.size(-1))
+#         h = torch.stack((branch_outputs), dim=1)
+#         h = h.view(-1, h.size(-1))
                 
-        h = self.lin_in(h)
+#         h = self.lin_in(h)
         
-        edge_attr = []
-        edge_index = []
+#         edge_attr = []
+#         edge_index = []
         
-        for i in range(0,len(h),len(self.groups)):
-            for add_1 in range(len(self.groups)):
-                for add_2 in range(len(self.groups)):
-                    edge_index.append((i+add_1,i+add_2))
+#         for i in range(0,len(h),len(self.groups)):
+#             for add_1 in range(len(self.groups)):
+#                 for add_2 in range(len(self.groups)):
+#                     edge_index.append((i+add_1,i+add_2))
 
                     
-        for (i,j) in edge_index:
-            edge_attr.append([1])
+#         for (i,j) in edge_index:
+#             edge_attr.append([1])
             
-        edge_attr = torch.Tensor(edge_attr)    
-        edge_index = torch.Tensor(edge_index).long().T  
+#         edge_attr = torch.Tensor(edge_attr)    
+#         edge_index = torch.Tensor(edge_index).long().T  
 
-        return h, edge_attr, edge_index
+#         return h, edge_attr, edge_index
         
-    def forward(self, data):
-        h = self.get_embeddings(data)
-        batch = data.batch
+#     def forward(self, data):
+#         h = self.get_embeddings(data)
+#         batch = data.batch
         
-        if self.pretrain and (self.model_type == 'gnn_basic' or self.model_type == 'gnn'):
-            masked_ids = data.masked_val
+#         if self.pretrain and (self.model_type == 'gnn_basic' or self.model_type == 'gnn'):
+#             masked_ids = data.masked_val
 
-            for i in range(len(masked_ids)):
-                num_nodes = 112
-                masked_ids[i] += (num_nodes)*i 
+#             for i in range(len(masked_ids)):
+#                 num_nodes = 112
+#                 masked_ids[i] += (num_nodes)*i 
                 
-            h_vals = h[masked_ids,:]
+#             h_vals = h[masked_ids,:]
                         
-            out = self.pretrain_output(h_vals)
-            return out[:,0]
+#             out = self.pretrain_output(h_vals)
+#             return out[:,0]
         
-        if self.model_type == 'gnn_bool' or self.model_type == 'gnn_bool_cem':
-            batch = []
-            for i in range(len(h)//len(self.groups)):
-                for j in range(len(self.groups)):
-                    batch.append(i)
-            batch = torch.Tensor(batch).long()
+#         if self.model_type == 'gnn_bool' or self.model_type == 'gnn_bool_cem':
+#             batch = []
+#             for i in range(len(h)//len(self.groups)):
+#                 for j in range(len(self.groups)):
+#                     batch.append(i)
+#             batch = torch.Tensor(batch).long()
         
-        if self.model_type == 'gnn_basic' or self.model_type == 'gnn_bool' or self.model_type == 'gnn_bool_cem':                        
-            h_graph = self.pool(h, batch)
+#         if self.model_type == 'gnn_basic' or self.model_type == 'gnn_bool' or self.model_type == 'gnn_bool_cem':                        
+#             h_graph = self.pool(h, batch)
             
-            out = self.lin_pred(h_graph)
-            return out
+#             out = self.lin_pred(h_graph)
+#             return out
         
-        batch_size = torch.max(batch)+1    
-        h_by_batch = h.reshape(batch_size,len(h)//batch_size,h.shape[1])
-        h_by_group = torch.zeros(batch_size,len(self.groups),h.shape[1])
+#         batch_size = torch.max(batch)+1    
+#         h_by_batch = h.reshape(batch_size,len(h)//batch_size,h.shape[1])
+#         h_by_group = torch.zeros(batch_size,len(self.groups),h.shape[1])
                 
-        for i in range(len(self.groups)):
-            h_by_group[:,i,:] = torch.mean(h_by_batch[:,self.groups[i],:],dim=1)
+#         for i in range(len(self.groups)):
+#             h_by_group[:,i,:] = torch.mean(h_by_batch[:,self.groups[i],:],dim=1)
 
-        if torch.cuda.is_available():
-            h_by_group = h_by_group.cuda()
+#         if torch.cuda.is_available():
+#             h_by_group = h_by_group.cuda()
             
-        h_by_whole = self.whole_pred(h_by_group.view(batch_size, -1))
-        out = self.lin_pred(h_by_whole)
-        return out
+#         h_by_whole = self.whole_pred(h_by_group.view(batch_size, -1))
+#         out = self.lin_pred(h_by_whole)
+#         return out
     
 def train(model, train_loader, optimizer, device, use_wandb=False, pretrain=False):
     model.train()
@@ -400,43 +400,43 @@ def train(model, train_loader, optimizer, device, use_wandb=False, pretrain=Fals
     return loss_all / len(train_loader.dataset)
 
 
-def eval_gnn(model, loader,pretrain=False):
-    model.eval()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    losses = []
-    error = 0
-    total = 0
+# def eval_gnn(model, loader,pretrain=False):
+#     model.eval()
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     losses = []
+#     error = 0
+#     total = 0
 
-    for data in loader:
-        data = data.to(device)
-        with torch.no_grad():
-            y_hat = model(data)
+#     for data in loader:
+#         data = data.to(device)
+#         with torch.no_grad():
+#             y_hat = model(data)
             
-            if pretrain:
-                losses.append(F.mse_loss(y_hat,data.y))
-                error += 1
-                total += 1
-            else:
-                losses.append(F.cross_entropy(y_hat, data.y))
-                y_pred = torch.argmax(y_hat,axis=1)
-                error += sum(y_pred != data.y)
-                total += len(data.y)
+#             if pretrain:
+#                 losses.append(F.mse_loss(y_hat,data.y))
+#                 error += 1
+#                 total += 1
+#             else:
+#                 losses.append(F.cross_entropy(y_hat, data.y))
+#                 y_pred = torch.argmax(y_hat,axis=1)
+#                 error += sum(y_pred != data.y)
+#                 total += len(data.y)
             
-    acc = 1-error/total
-    loss = torch.mean(torch.stack(losses))
+#     acc = 1-error/total
+#     loss = torch.mean(torch.stack(losses))
             
-    return loss, acc
+#     return loss, acc
 
 
 def initialize_model(model_type,hyperparameters,dataset,use_wandb=False,pretrain=False,weights={}):
-    if 'gnn' in model_type:
-        model = MPNNModel(model_type, hyperparameters,use_wandb=use_wandb,pretrain=pretrain)
+#     if 'gnn' in model_type:
+#         model = MPNNModel(model_type, hyperparameters,use_wandb=use_wandb,pretrain=pretrain)
         
-        if weights != {}:
-            model.load_state_dict(weights,strict=False)
+#         if weights != {}:
+#             model.load_state_dict(weights,strict=False)
         
-    elif 'mlp' in model_type:
-        model = Decoder_CBM(model_type, hyperparameters,use_wandb=use_wandb)
+#     elif 'mlp' in model_type:
+    model = Decoder_CBM(model_type, hyperparameters,use_wandb=use_wandb)
         
     if use_wandb:
         config = {}
@@ -470,62 +470,61 @@ def initialize_model(model_type,hyperparameters,dataset,use_wandb=False,pretrain
     return model
         
 def train_model(model,model_type,train_dataset,val_dataset,hyperparameters,verbose=False,use_wandb=False,pretrain=False): 
-    if 'gnn' not in model_type:
-        batch_size = 32
-        if use_wandb:
-            wandb_logger = WandbLogger()
-            wandb_logger.watch(model)
-            trainer = pl.Trainer(auto_scale_batch_size='power', gpus=0, deterministic=True, max_epochs=hyperparameters['epochs'], enable_progress_bar=verbose,logger=wandb_logger, log_every_n_steps=batch_size)
-        else:
-            trainer = pl.Trainer(auto_scale_batch_size='power', gpus=0, deterministic=True, max_epochs=hyperparameters['epochs'], enable_progress_bar=verbose, log_every_n_steps=batch_size)
-        trainer.fit(model, DataLoader(train_dataset,batch_size=batch_size),DataLoader(val_dataset,batch_size=32))
-        
-        return model
+#     if 'gnn' not in model_type:
+    batch_size = 32
+    if use_wandb:
+        wandb_logger = WandbLogger()
+        wandb_logger.watch(model)
+        trainer = pl.Trainer(auto_scale_batch_size='power', gpus=0, deterministic=True, max_epochs=hyperparameters['epochs'], enable_progress_bar=verbose,logger=wandb_logger, log_every_n_steps=batch_size)
     else:
-        if use_wandb:
-            wandb.watch(model, log='all')
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters['lr'])
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=hyperparameters['epochs'])
-    
-        for epoch in range(1, 1+hyperparameters['epochs']):
-            model.train()
-            train(model, train_dataset, optimizer, device,use_wandb=use_wandb,pretrain=pretrain)
-            
-            if use_wandb:
-                train_loss, train_acc = eval_gnn(model, train_dataset,pretrain=pretrain)
-                val_loss, val_acc = eval_gnn(model, val_dataset,pretrain=pretrain)
+        trainer = pl.Trainer(auto_scale_batch_size='power', gpus=0, deterministic=True, max_epochs=hyperparameters['epochs'], enable_progress_bar=verbose, log_every_n_steps=batch_size)
+    trainer.fit(model, DataLoader(train_dataset,batch_size=batch_size),DataLoader(val_dataset,batch_size=32))
 
-                wandb.log({'train_acc': train_acc, 'train_loss': train_loss, 'val_loss': val_loss, 'val_acc': val_acc})
-            scheduler.step()
+    return model
+#     else:
+#         if use_wandb:
+#             wandb.watch(model, log='all')
+#         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+#         optimizer = torch.optim.Adam(model.parameters(), lr=hyperparameters['lr'])
+#         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=hyperparameters['epochs'])
+    
+#         for epoch in range(1, 1+hyperparameters['epochs']):
+#             model.train()
+#             train(model, train_dataset, optimizer, device,use_wandb=use_wandb,pretrain=pretrain)
             
-        return model        
+#             if use_wandb:
+#                 train_loss, train_acc = eval_gnn(model, train_dataset,pretrain=pretrain)
+#                 val_loss, val_acc = eval_gnn(model, val_dataset,pretrain=pretrain)
+
+#                 wandb.log({'train_acc': train_acc, 'train_loss': train_loss, 'val_loss': val_loss, 'val_acc': val_acc})
+#             scheduler.step()
+            
+#         return model        
     
 def eval_model(model,model_type, val_loader,pretrain=False):
-    if 'gnn' not in model_type:
-        y = torch.stack([sample[1] for sample in val_loader])
-        c = torch.stack([sample[2] for sample in val_loader])
-        
-        predictions = model(c)
-        softmaxed_logits = F.softmax(predictions, dim=1)
-        loss = F.cross_entropy(softmaxed_logits, y)
-        
-        if len(predictions.shape) == 2:
-            predictions = torch.argmax(predictions,dim=1)
-            acc = float(sum(predictions == y)/len(y))
-        else:
-            binary_predictions = (predictions >= 0.5).int()
-            acc = torch.mean((binary_predictions == y.int()).float()).item()
-        
-        if softmaxed_logits.shape[1] == 2:
-            auc = roc_auc_score(y.cpu().numpy(), softmaxed_logits.detach().cpu().numpy()[:, 1])
-            return loss, acc, auc
-            
-        return loss,acc
+#     if 'gnn' not in model_type:
+    y = torch.stack([sample[1] for sample in val_loader])
+    c = torch.stack([sample[2] for sample in val_loader])
 
+    predictions = model(c)
+    softmaxed_logits = F.softmax(predictions, dim=1)
+    loss = F.cross_entropy(softmaxed_logits, y)
+
+    if len(predictions.shape) == 2:
+        predictions = torch.argmax(predictions,dim=1)
+        acc = float(sum(predictions == y)/len(y))
     else:
-        return eval_gnn(model,val_loader,pretrain=pretrain)
+        binary_predictions = (predictions >= 0.5).int()
+        acc = torch.mean((binary_predictions == y.int()).float()).item()
+
+    if softmaxed_logits.shape[1] == 2:
+        auc = roc_auc_score(y.cpu().numpy(), softmaxed_logits.detach().cpu().numpy()[:, 1])
+        return loss, acc, auc
+
+    return loss,acc
+#     else:
+#         return eval_gnn(model,val_loader,pretrain=pretrain)
     
 def find_optimal_lr(model_type,lr_values,baseline_hyperparameters,train_dataset,val_dataset):
     hyperparameters = deepcopy(baseline_hyperparameters)
