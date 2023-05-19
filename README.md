@@ -1,10 +1,10 @@
 # Concept Hierarchies for Concept Learning Methods
 
-![Concept Hierarchies](figures/pull_figure.png)
+![Concept Hierarchies](img/pull_figure.png)
 
 This repository contains the implementation for the thesis "Concept Hierarchies for Concept Learning Methods", for the Masters in Philosophy course at Cambridge University.
 
-This work was done by [Naveen Raman](https://naveenraman.com/)
+This work was done by [Naveen Raman](https://naveenraman.com/), [Mateo Espinosa](https://hairyballtheorem.com/), and [Mateja Jamnik](https://www.cl.cam.ac.uk/~mj201/). 
 
 #### TL;DR
 We construct concept hierarchies, a way to capture concept-concept relationships in concept models. These hierarchies provide a qualitative visual summary of a model, while being stable across iterations and robust to noise. Additionally, concept hierarchies assist with downstream applications include concept intervention and classification. 
@@ -29,11 +29,11 @@ We use four datasets for the project: CUB, CheXpert, DSprites, and colored MNIST
 1. <b>Colored MNIST:</b> We download the Colored MNIST dataset from <a href="https://drive.google.com/u/0/uc?id=1NSv4RCSHjcHois3dXjYw_PaLIoVlLgXu&export=download">here</a>, and use the ```mnist_10color_jitter_var_0.030.npy``` variant.
 2. <b>CUB:</b> We download the CUB dataset from <a href="https://www.vision.caltech.edu/datasets/cub_200_2011/">here</a>. 
 3. <b>DSprites:</b> We develop DSprites from .npz files in the DSprites directory; to create the dataset, run the following: 
-```python
+    ```python
 
-from src.dataset import write_ten_dsprites
-write_ten_dsprites()
-```
+    from src.dataset import write_ten_dsprites
+    write_ten_dsprites()
+    ```
 4. <b>CheXpert:</b> We use the small variant of CheXpert from <a href="https://www.kaggle.com/datasets/ashery/chexpert">here</a>
 
 
@@ -42,12 +42,55 @@ Install each to the dataset/images folder; for examples on what image paths shou
 ## Constructing Concept Hierarchies
 We give instructions on how to develop each of the following concept vectors: Label,Shapley,Concept2Vec, and detail CEM later
 1. <b>Label:</b> To construct label vectors, simply run the following function
-```python
-load_label_vectors_simple(attribute,dataset,suffix,seed=-1)
-```
+    ```python
+    from src.concept_vectors import load_label_vectors_simple 
+    from src.dataset import CUB_Dataset
+    attribute = "has_bill_shape::dagger"
+    suffix = ""
+    seed = 43
+    dataset = CUB_Dataset()
+    
+    load_label_vectors_simple(attribute,dataset,suffix,seed=seed)
+    ```
 where suffix is either "", "_image_robustness", or "_image_responsiveness". Dataset is an object from the Dataset class in `dataset.py`, and attribute is a string representing a concept. 
-2. <b>Shapley:</b> 
-3. <b>Concept2Vec:</b> 
+
+2. <b>Shapley:</b>To train Shapley vectors, we first train encoder-decoder models:
+    ```python
+    from src.models import train_large_image_model
+
+    dataset = CUB_Dataset()
+    model_name = "vgg16"
+    suffix = ""
+    noise_std = 0
+    seed = 43
+    train_large_image_model(dataset,model_name,suffix=suffix,seed=seed,noise_std=noise_std)
+    ```
+We then train Shapley vectors using this
+    ```python
+    from src.create_vectors import create_shapley_vectors
+    from src.dataset import CUB_Dataset
+    from src.concept_vectors import load_shapley_vectors
+    seed = 43
+    attributes = [""has_bill_shape::dagger""]
+    model_name = "VGG16"
+    suffix = ""
+    create_shapley_vectors(attributes,dataset,suffix,seed=seed,model_name=model_name)
+    load_shapley_vectors_simple(attribute,dataset,suffix,seed=seed)
+    ```
+3. <b>Concept2Vec:</b>We run the following function to create concept2vec vectors:
+    ```python
+    from src.concept_vectors import load_concept2vec_vectors_simple
+    from src.dataset import CUB_Dataset
+    from src.create_vectors import create_concept2vec
+    
+    attribute = "has_bill_shape::dagger"
+    suffix = ""
+    seed = 43
+    dataset = CUB_Dataset()
+    create_concept2vec(dataset,suffix,seed=-1,
+                                 embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None)    
+    load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=seed)
+    ```
 
 ## Evaluating Concept Hierarchies
 After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierarchies.ipynb`
