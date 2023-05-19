@@ -1,3 +1,5 @@
+!results/evalaution
+!results/knn
 dataset/
 .ipynb_checkpoints
 *.egg-info
@@ -7,5 +9,3 @@ logs/
 *.pyc
 results/
 scripts/Figures/
-!results/evaluation
-!results/knn
