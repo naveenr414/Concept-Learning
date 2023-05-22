@@ -36,7 +36,6 @@ We use four datasets for the project: CUB, CheXpert, DSprites, and colored MNIST
     ```
 4. <b>CheXpert:</b> We use the small variant of CheXpert from <a href="https://www.kaggle.com/datasets/ashery/chexpert">here</a>
 
-
 Install each to the dataset/images folder; for examples on what image paths should look like, use the preprocessed/train.py file. 
 
 ## Constructing Concept Hierarchies
@@ -87,17 +86,55 @@ We then train Shapley vectors using this
     suffix = ""
     seed = 43
     dataset = CUB_Dataset()
-    create_concept2vec(dataset,suffix,seed=-1,
+    create_concept2vec(dataset,suffix,seed=seed,
                                  embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None)    
     load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=seed)
     ```
 
 ## Evaluating Concept Hierarchies
 After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierarchies.ipynb`
-<b> Discuss everything this requires </b>
+1. Develop the robustness and responsiveness dataset
+    ```python
+    from src.dataset import CUB_Dataset
+    
+    dataset = CUB_Dataset()
+    dataset.create_robustness()
+    dataset.create_responsiveness()
+    ```
+2. Train the required vectors, including one additional reference model for faithfulness
+    ```python
+    from src.concept_vectors import load_concept2vec_vectors_simple
+    from src.dataset import CUB_Dataset
+    from src.create_vectors import create_concept2vec
+    
+    for suffix in ["","_image_robustness","_image_responsiveness"]:
+        for seed in [43,44,45]:
+        create_concept2vec(dataset,suffix,seed=seed,
+                                     embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None)    
+    create_concept2vec(dataset,"",seed=42,embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None
+    ```
+3. Evaluate the vectors (code from `scripts/Evaluate Hierarchies.ipynb`
+    ```python
+    from src.dataset import CUB_Dataset
+    from src.metrics import compute_all_metrics
+    dataset = CUB_Dataset()
+    attributes = dataset.get_attributes()
+    method = load_concept2vec_vectors_simple
+    seeds = [43,44,45]
+    
+    results = compute_all_metrics(method,
+                                        dataset,
+                                        attributes,
+                                        seeds)
+    ```
+
+
 
 ## Concept Intervention and Training CEM Vectors
-<b> Insert how to set up CEM </b> 
+We use the Concept Embedding Model (CEM) to test for intervention with hierarchies. The CEM model has its own dependencies, and instructions for setting it up is available <a href="https://github.com/mateoespinosa/cem/tree/main">here</a>. We modify certain files to account for concept hierarchy-specific functionality, and place t hose files in scripts/cem_scripts
+<b>TODO: Change this so the actual CEM module is there</b>
+<b>TODO: Change src/ to hierarchy/</b> 
+
 ### Training CEM Vectors
 To train CEM vectors, we run the following: 
 ```bash
@@ -107,11 +144,40 @@ $ python experiments/extract_cem_concepts.py --experiment_name $experiment_name 
 In this, `experiment_name` is one of mnist, cub, dsprites, or chexpert, `num_gpus` is the number of GPUs available, and `seed` is the random seed. The resulting vectors are stored at `cem_concepts` folder. 
 
 ### Concept Intervention
-We perform concept intervention using hierarchies in the `notebooks/CEM Intervention Experiments.ipynb` file. This requires a previously trained CEM file <b> Insert details on how to store a CEM file </b>. Additionally, this requires concept vectors in the `concept_vectors` folder, which we generate by <b>Insert details on how to generate this file</b>. 
+We perform concept intervention using hierarchies in the `scripts/cem_scripts/CEM Intervention Experiments.ipynb` file. This requires a previously trained CEM model; instructions for this are in the <a href="https://github.com/mateoespinosa/cem/tree/main">CEM repository</a>. We additionally provide a pre-trained CEM model, with CUB, which we use for our intervention experiments <a href="https://drive.google.com/file/d/1bqoH2Xho5itQ4g_H59rwm8uG4EHYcCte/view?usp=sharing">here</a> with the config file <a href="https://drive.google.com/file/d/1Gryri_6tAPY1DRY93_TDB3FVIX58Y6Iw/view?usp=sharing">here</a>. To use these, run the following: 
+```python
+config = joblib.load("models/ConceptEmbeddingModel_resnet34_fold_1_experiment_config.joblib")
+if config['weight_loss']:
+    imbalance = find_class_imbalance(train_data_path, True)
+else:
+    imbalance = None
+model = intervention_utils.load_trained_model(
+            config=config,
+            n_tasks=n_tasks,
+            n_concepts=n_concepts,
+            result_dir="models/",
+            split=0,
+            imbalance=imbalance,
+            intervention_idxs=intervention_idxs,
+            train_dl=sample_train_dl,
+            sequential=False,
+            independent=False,
+        )
+```
+
+Additionally, this requires concept vectors in the `concept_vectors` folder, which we generate byrunning the following: 
+```python
+from src.util import save_concept_vectors
+from src.dataset import CUB_Dataset
+from src.concept_vectors import load_shapley_vectors_simple
+save_concept_vectors(load_shapley_vectors_simple,CUB_Dataset(),43,"shapley_43")
+```
+This saves a file called `results/concept_vectors/shapley_43.npy`, which can be used with the `CEM Intervention Experiments.ipynb` notebook. This notebook details how to perform hierarchical interventions with a variety of hierarchies.  
 
 ## Classification and other Applications
 We leverage concept hierarchies to fix concept values predicted by encoder models. 
 
 <b> Insert how to generate the logits </b> 
+<b> Create a function to turn train_c.npy into train_c_fixed.npy </b>
 
 If the resulting logits are stored at `results/logits/CUB/train_c.npy`, etc., then we run the `scripts/Downstream Experiments.ipynb` to fix concept predictions, and evaluate these predictions over a KNN model. These new logit predictions are stored at `results/logits/CUB/train_c_fixed.npy` (etc.), and are used to train a decoder. We train this decoder using an MLP model in `scripts/Hierarchical CBM.ipynb`. 

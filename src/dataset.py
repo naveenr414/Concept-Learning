@@ -63,7 +63,7 @@ class Dataset:
 
 
     
-    def create_gaussian(self):
+    def create_robustness(self):
         flip_probability = .01
         
         for file_name in [self.pkl_path,self.test_pkl_path]:
@@ -77,7 +77,7 @@ class Dataset:
 
         self.run_function(self.root_folder_name+"_image_robustness",lambda arr: add_gaussian_noise(arr,0,50))
     
-    def create_junk(self):
+    def create_responsiveness(self):
         flip_probability = 0.5
         for file_name in [self.pkl_path,self.test_pkl_path]:
             input_file = file_name.format('')

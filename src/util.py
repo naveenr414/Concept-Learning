@@ -514,3 +514,35 @@ def contribution_score(concepts,predictions,concept_num,prediction_num,metric=Fa
     else:
         return np.mean(logit_values)-np.mean(logit_values_without)
     
+def save_concept_vectors(method,dataset,seed,file_name):
+    """Save a list of concept vectors for a particular method to 
+        results/concept_vectors/file_name.npy
+        
+    Arguments:
+        method: One of the 'load_shapley_vectors_simple' style functions
+        dataset: Object from the Dataset class
+        seed: Number, indicating which seed to load
+        file_name: String saying the name of the npy to be stored
+    
+    Returns: Nothing
+    
+    Side Effects: Saves all concept_vectors to results/concept_vectors/file_name.npy
+    """
+    
+    directory = "results/concept_vectors"
+    
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+    all_vectors = []
+    
+    attributes = dataset.get_attributes()
+    
+    for a in attributes:
+        vectors = method(a,dataset,"",seed=seed)
+        vectors = np.mean(vectors,dim=1)
+        all_vectors.append(vectors)
+    all_vectors = np.array(all_vectors)
+    
+    np.save(all_vectors,open("{}/{}.npy".format(directory,file_name),"wb"))
+    
