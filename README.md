@@ -51,9 +51,9 @@ We give instructions on how to develop each of the following concept vectors: La
     
     load_label_vectors_simple(attribute,dataset,suffix,seed=seed)
     ```
-where suffix is either "", "_image_robustness", or "_image_responsiveness". Dataset is an object from the Dataset class in `dataset.py`, and attribute is a string representing a concept. 
+    where suffix is either "", "_image_robustness", or "_image_responsiveness". Dataset is an object from the Dataset class in `dataset.py`, and attribute is a string representing a concept. 
 
-2. <b>Shapley:</b>To train Shapley vectors, we first train encoder-decoder models:
+2. <b>Shapley:</b> To train Shapley vectors, we first train encoder-decoder models:
     ```python
     from src.models import train_large_image_model
 
@@ -64,7 +64,9 @@ where suffix is either "", "_image_robustness", or "_image_responsiveness". Data
     seed = 43
     train_large_image_model(dataset,model_name,suffix=suffix,seed=seed,noise_std=noise_std)
     ```
-We then train Shapley vectors using this
+    
+    We then train Shapley vectors using this
+    
     ```python
     from src.create_vectors import create_shapley_vectors
     from src.dataset import CUB_Dataset
@@ -76,7 +78,7 @@ We then train Shapley vectors using this
     create_shapley_vectors(attributes,dataset,suffix,seed=seed,model_name=model_name)
     load_shapley_vectors_simple(attribute,dataset,suffix,seed=seed)
     ```
-3. <b>Concept2Vec:</b>We run the following function to create concept2vec vectors:
+3. <b>Concept2Vec:</b> We run the following function to create concept2vec vectors:
     ```python
     from src.concept_vectors import load_concept2vec_vectors_simple
     from src.dataset import CUB_Dataset
@@ -90,6 +92,32 @@ We then train Shapley vectors using this
                                  embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None)    
     load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=seed)
     ```
+    
+Once the vectors are created, the hierarchy can be visualized as follows: 
+```python
+from src.dataset import CUB_Dataset
+from src.hierarchy import create_ward_hierarchy
+from src.concept_vectors import load_shapley_vectors_simple
+dataset = CUB_Dataset()
+attributes = dataset.get_attributes()
+
+hierarchy = create_hierarchy(create_ward_hierarchy,load_shapley_vectors_simple,dataset,'',attributes,43)
+print(hierarchy)
+```
+Output:
+```
+          ---- has_upper_tail_color::buff
+     ----|
+          ---- has_under_tail_color::buff
+
+----|
+           ---- has_upperparts_color::buff
+      ----|
+                ---- has_wing_color::buff
+           ----|
+                ---- has_back_color::buff
+```
+
 
 ## Evaluating Concept Hierarchies
 After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierarchies.ipynb`
@@ -132,8 +160,6 @@ After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierar
 
 ## Concept Intervention and Training CEM Vectors
 We use the Concept Embedding Model (CEM) to test for intervention with hierarchies. The CEM model has its own dependencies, and instructions for setting it up is available <a href="https://github.com/mateoespinosa/cem/tree/main">here</a>. We modify certain files to account for concept hierarchy-specific functionality, and place t hose files in scripts/cem_scripts
-<b>TODO: Change this so the actual CEM module is there</b>
-<b>TODO: Change src/ to hierarchy/</b> 
 
 ### Training CEM Vectors
 To train CEM vectors, we run the following: 
@@ -177,7 +203,17 @@ This saves a file called `results/concept_vectors/shapley_43.npy`, which can be 
 ## Classification and other Applications
 We leverage concept hierarchies to fix concept values predicted by encoder models. 
 
-<b> Insert how to generate the logits </b> 
-<b> Create a function to turn train_c.npy into train_c_fixed.npy </b>
+We first produce logit predictions using the <a href="https://github.com/yewsiang/ConceptBottleneck">CBM library</a> by training an encoder and getting predictions over the dataset.   
 
-If the resulting logits are stored at `results/logits/CUB/train_c.npy`, etc., then we run the `scripts/Downstream Experiments.ipynb` to fix concept predictions, and evaluate these predictions over a KNN model. These new logit predictions are stored at `results/logits/CUB/train_c_fixed.npy` (etc.), and are used to train a decoder. We train this decoder using an MLP model in `scripts/Hierarchical CBM.ipynb`. 
+We then fix the logits using the following function:  
+```python
+from src.dataset import CUB_Dataset
+from src.concept_vectors import load_shapley_vectors_simple, fix_predictions
+
+fix_predictions(load_shapley_vectors_simple,CUB_Dataset(),43,
+                    "train.npy","valid.npy","test.npy",
+                    "train.pkl","valid.pkl","test.pkl",
+                    "train_fixed.npy","valid_fixed.npy","test_fixed.npy")
+```
+
+More details on this can be found in the `scripts/Downstream Experiments.ipynb`, which generates the train_fixed, etc. and the `scripts/cem_scripts/Hierarchical CBM.ipynb`, which uses these for classification. 

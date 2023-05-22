@@ -19,7 +19,167 @@ import keras
 import time
 from sklearn.decomposition import PCA
 import pandas as pd 
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neural_network import MLPClassifier
 
+def row_to_fix(logits,new_relations_0,new_relations_1,similar_0,similar_1):
+    x_vals = []
+    
+    for i in range(len(logits)):
+        logit_value = logits[i]
+        similar_0 = new_relations_0[i]
+        similar_probs = [k[1] for k in similar_0]
+        similar_0_logits = [logits[k[0]] for k in similar_0]
+        
+        
+        similar_1 = new_relations_1[i]
+        similar_probs_1 = [k[1] for k in similar_1]
+        similar_1_logits = [logits[k[0]] for k in similar_1]
+        
+        temp = [logit_value]
+        temp += similar_probs
+        temp += similar_0_logits
+        temp += similar_probs_1
+        temp += similar_1_logits
+                
+        x_vals.append(temp)
+        
+    return x_vals
+
+def row_to_fix_2(logits,new_relations_0,new_relations_1,similar_0,similar_1):
+    x_vals = []
+    
+    for i in range(len(logits)):
+        logit_value = logits[i]
+        similar_0 = new_relations_0[i]
+        similar_probs = [k[1] for k in similar_0]
+        similar_0_logits = [logits[k[0]] for k in similar_0]
+        
+        
+        similar_1 = new_relations_1[i]
+        similar_probs_1 = [k[1] for k in similar_1]
+        similar_1_logits = [logits[k[0]] for k in similar_1]
+        
+        temp = [logit_value]
+        temp += similar_probs
+        temp += similar_0_logits
+        temp += similar_probs_1
+        temp += similar_1_logits
+                
+        x_vals.append(temp)
+        
+    return x_vals
+
+def get_fix_data(logits,x,new_relations_0,new_relations_1,similar_0,similar_1,func=row_to_fix):
+    fix = []
+    y = []
+    
+    for row in logits:
+        fix += func(row,new_relations_0,new_relations_1,similar_0,similar_1)
+    
+    for row in x:
+        y += list(row)
+    fix = np.array(fix)
+    y = np.array(y)
+    
+    return fix, y
+
+def get_new_relatations(train_x):
+    new_relations_0 = {}
+    new_relations_1 = {}
+
+    for i in range(num_columns):
+        # See what makes this 0
+        all_nums = []
+
+        for j in range(num_columns):
+            if i != j:
+                times_when_i_0 = 1-train_x[:,i]
+                times_when_j_0 = 1-train_x[:,j]
+                total_i_0 = len((times_when_i_0).nonzero()[0])
+                total_j_0 = len((times_when_j_0).nonzero()[0])
+                frac_times = len(((times_when_i_0)*(times_when_j_0)).nonzero()[0])
+
+                if total_j_0 != 0:
+                    frac_times /= total_j_0
+                else:
+                    frac_times = 0
+                all_nums.append((j,frac_times))
+
+        new_relations_0[i] = sorted(all_nums,key=lambda k: k[1],reverse=True)[:5]
+    for i in range(num_columns):
+        # See what makes this 0
+        all_nums = []
+
+        for j in range(num_columns):
+            if i != j:
+                times_when_i_1 = train_x[:,i]
+                times_when_j_1 = train_x[:,j]
+                total_i_1 = len((times_when_i_1).nonzero()[0])
+                total_j_1 = len((times_when_j_1).nonzero()[0])
+                frac_times = len(((times_when_i_1)*(times_when_j_1)).nonzero()[0])
+
+                if total_j_1 != 0:
+                    frac_times /= total_j_1
+                else:
+                    frac_times = 0
+                all_nums.append((j,frac_times))
+
+        new_relations_1[i] = sorted(all_nums,key=lambda k: k[1],reverse=True)[:5]
+        
+    return new_relations_0, new_relations_1
+
+def fix_predictions(method,dataset,seed
+                    train_logits_file,valid_logits_file,test_logits_file,
+                    train_preprocessed_file,valid_preprocessed_file,test_preprocessed_file,
+                    output_train,output_valid,output_test):
+    """
+    Arguments:
+        method: Function such as load_shapley_vectors_Simple
+        dataset: Object from the Dataset class
+        seed: Number such as 43
+        
+        train_logits_file: String with npy file containing input train logits (such as train_logits.npy)
+        valid_logits_file: String with npy file containing input valid logits (such as valid_logits.npy)
+        test_logits_file: String with npy file containing input test logits (such as test_logits.npy)
+        
+        train_preprocessed_file: String with .pkl file containing train preprocessed (such as train.pkl)
+        valid_preprocessed_file: String with .pkl file containing valid preprocessed (such as valid.pkl)
+        test_preprocessed_file: String with .pkl file containing test preprocessed (such as test.pkl)
+        
+        output_train: String with npy file on where to dump results (such as train_logits_fixed.npy)
+        output_valid: String with npy file on where to dump results (such as valid_logits_fixed.npy)
+        output_test: String with npy file on where to dump results (such as test_logits_fixed.npy)
+        
+    Returns: Nothing
+    
+    Side Effects: Writes the output npy files for train, valid, test"""
+    
+    embedding_matrix = np.array([method(a,dataset,"",seed)[0] for a in dataset.get_attributes()])
+    sim_matrix = cosine_similarity(embedding_matrix)
+    clf_concept = MLPClassifier(max_iter=100)
+    
+    train_logits = np.load(train_logits_file)
+    valid_logits = np.load(valid_logits_file)
+    test_logits = np.load(test_logits_file)
+    
+    new_relations_0, new_relations_1 = get_new_relations(train_x)
+        
+    train_fix_concept, train_fix_y = get_fix_data(train_logits,train_x,
+                                                  new_relations_0,new_relations_1,func=row_to_fix_2)
+    valid_fix_concept, valid_fix_y = get_fix_data(valid_logits,valid_x,
+                                                  new_relations_0,new_relations_1,func=row_to_fix_2)
+    test_fix_concept, test_fix_y = get_fix_data(test_logits,test_x,
+                                                new_relations_0,new_relations_1,func=row_to_fix_2)
+    
+    clf_concept.fit(train_fix_concept,train_fix_y)
+    train_predict_concept_proba = clf_concept.predict_proba(train_fix_concept)[:,1].reshape(train_x.shape)
+    valid_predict_concept_proba = clf_concept.predict_proba(valid_fix_concept)[:,1].reshape(valid_x.shape)
+    test_predict_concept_proba = clf_concept.predict_proba(test_fix_concept)[:,1].reshape(test_x.shape)
+   
+    np.save(open(output_train,"wb"),train_predict_concept_proba)
+    np.save(open(output_valid,"wb"),valid_predict_concept_proba)
+    np.save(open(output_test,"wb"),test_predict_concept_proba)
 
 def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="results/cem_concepts"):
     """Load all the 'active' embeddings from Concept Embedding Models
