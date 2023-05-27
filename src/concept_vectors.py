@@ -46,36 +46,40 @@ def row_to_fix(logits,new_relations_0,new_relations_1,similar_0,similar_1):
         
     return x_vals
 
-def row_to_fix_2(logits,new_relations_0,new_relations_1,similar_0,similar_1):
+def row_to_fix_2(logits,new_relations_0,new_relations_1,sim_matrix):
     x_vals = []
     
     for i in range(len(logits)):
         logit_value = logits[i]
         similar_0 = new_relations_0[i]
         similar_probs = [k[1] for k in similar_0]
+        similar_0_similarities = [sim_matrix[i][k[0]] for k in similar_0]
         similar_0_logits = [logits[k[0]] for k in similar_0]
         
         
         similar_1 = new_relations_1[i]
         similar_probs_1 = [k[1] for k in similar_1]
+        similar_1_similarities = [sim_matrix[i][k[0]] for k in similar_1]
         similar_1_logits = [logits[k[0]] for k in similar_1]
         
         temp = [logit_value]
         temp += similar_probs
+        temp += similar_0_similarities
         temp += similar_0_logits
         temp += similar_probs_1
+        temp += similar_1_similarities
         temp += similar_1_logits
                 
         x_vals.append(temp)
         
     return x_vals
 
-def get_fix_data(logits,x,new_relations_0,new_relations_1,similar_0,similar_1,func=row_to_fix):
+def get_fix_data(logits,x,new_relations_0,new_relations_1,sim_matrix,func=row_to_fix):
     fix = []
     y = []
     
     for row in logits:
-        fix += func(row,new_relations_0,new_relations_1,similar_0,similar_1)
+        fix += func(row,new_relations_0,new_relations_1,sim_matrix)
     
     for row in x:
         y += list(row)
@@ -84,10 +88,12 @@ def get_fix_data(logits,x,new_relations_0,new_relations_1,similar_0,similar_1,fu
     
     return fix, y
 
-def get_new_relatations(train_x):
+def get_new_relations(train_x):
     new_relations_0 = {}
     new_relations_1 = {}
 
+    num_columns = train_x.shape[1]
+    
     for i in range(num_columns):
         # See what makes this 0
         all_nums = []
@@ -107,6 +113,7 @@ def get_new_relatations(train_x):
                 all_nums.append((j,frac_times))
 
         new_relations_0[i] = sorted(all_nums,key=lambda k: k[1],reverse=True)[:5]
+
     for i in range(num_columns):
         # See what makes this 0
         all_nums = []
@@ -129,7 +136,7 @@ def get_new_relatations(train_x):
         
     return new_relations_0, new_relations_1
 
-def fix_predictions(method,dataset,seed
+def fix_predictions(method,dataset,seed,
                     train_logits_file,valid_logits_file,test_logits_file,
                     train_preprocessed_file,valid_preprocessed_file,test_preprocessed_file,
                     output_train,output_valid,output_test):
@@ -163,14 +170,19 @@ def fix_predictions(method,dataset,seed
     valid_logits = np.load(valid_logits_file)
     test_logits = np.load(test_logits_file)
     
+    train_x = np.array([i['attribute_label'] for i in pickle.load(open(train_preprocessed_file,"rb"))])
+    valid_x = np.array([i['attribute_label'] for i in pickle.load(open(valid_preprocessed_file,"rb"))])
+    test_x = np.array([i['attribute_label'] for i in pickle.load(open(test_preprocessed_file,"rb"))])
+    
     new_relations_0, new_relations_1 = get_new_relations(train_x)
         
     train_fix_concept, train_fix_y = get_fix_data(train_logits,train_x,
-                                                  new_relations_0,new_relations_1,func=row_to_fix_2)
+                                                  new_relations_0,new_relations_1,sim_matrix,func=row_to_fix_2)
     valid_fix_concept, valid_fix_y = get_fix_data(valid_logits,valid_x,
-                                                  new_relations_0,new_relations_1,func=row_to_fix_2)
+                                                  new_relations_0,new_relations_1,sim_matrix,func=row_to_fix_2)
     test_fix_concept, test_fix_y = get_fix_data(test_logits,test_x,
-                                                new_relations_0,new_relations_1,func=row_to_fix_2)
+                                                new_relations_0,new_relations_1,sim_matrix,func=row_to_fix_2)
+    
     
     clf_concept.fit(train_fix_concept,train_fix_y)
     train_predict_concept_proba = clf_concept.predict_proba(train_fix_concept)[:,1].reshape(train_x.shape)

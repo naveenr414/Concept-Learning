@@ -96,7 +96,7 @@ We give instructions on how to develop each of the following concept vectors: La
 Once the vectors are created, the hierarchy can be visualized as follows: 
 ```python
 from src.dataset import CUB_Dataset
-from src.hierarchy import create_ward_hierarchy
+from src.hierarchy import create_ward_hierarchy, create_hierarchy
 from src.concept_vectors import load_shapley_vectors_simple
 dataset = CUB_Dataset()
 attributes = dataset.get_attributes()
@@ -145,6 +145,7 @@ After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierar
     ```python
     from src.dataset import CUB_Dataset
     from src.metrics import compute_all_metrics
+    from src.concept_vectors import load_concept2vec_vectors_simple
     dataset = CUB_Dataset()
     attributes = dataset.get_attributes()
     method = load_concept2vec_vectors_simple
@@ -159,7 +160,7 @@ After creating concept vectors, we evaluate them in the `scripts/Evaluate Hierar
 
 
 ## Concept Intervention and Training CEM Vectors
-We use the Concept Embedding Model (CEM) to test for intervention with hierarchies. The CEM model has its own dependencies, and instructions for setting it up is available <a href="https://github.com/mateoespinosa/cem/tree/main">here</a>. We modify certain files to account for concept hierarchy-specific functionality, and place t hose files in scripts/cem_scripts
+We use the Concept Embedding Model (CEM) to test for intervention with hierarchies. The CEM model has its own dependencies, and instructions for setting it up is available <a href="https://github.com/mateoespinosa/cem/tree/main">here</a>. We modify certain files to account for concept hierarchy-specific functionality, place those files in `scripts/cem_scripts`, and store a working directory with all those files in the `cem` folder
 
 ### Training CEM Vectors
 To train CEM vectors, we run the following: 
@@ -211,9 +212,9 @@ from src.dataset import CUB_Dataset
 from src.concept_vectors import load_shapley_vectors_simple, fix_predictions
 
 fix_predictions(load_shapley_vectors_simple,CUB_Dataset(),43,
-                    "train.npy","valid.npy","test.npy",
-                    "train.pkl","valid.pkl","test.pkl",
-                    "train_fixed.npy","valid_fixed.npy","test_fixed.npy")
+                    "results/logits/cub/train_c.npy","results/logits/cub/valid_c.npy","results/logits/cub/test_c.npy",
+                    "dataset/CUB/preprocessed/train.pkl","dataset/CUB/preprocessed/val.pkl","dataset/CUB/preprocessed/test.pkl",
+                    "results/logits/cub/train_fixed.npy","results/logits/cub/valid_fixed.npy","results/logits/cub/test_fixed.npy")
 ```
 
 More details on this can be found in the `scripts/Downstream Experiments.ipynb`, which generates the train_fixed, etc. and the `scripts/cem_scripts/Hierarchical CBM.ipynb`, which uses these for classification. 
