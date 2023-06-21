@@ -171,7 +171,7 @@ $ python experiments/extract_cem_concepts.py --experiment_name $experiment_name 
 In this, `experiment_name` is one of mnist, cub, dsprites, or chexpert, `num_gpus` is the number of GPUs available, and `seed` is the random seed. The resulting vectors are stored at `cem_concepts` folder. 
 
 ### Concept Intervention
-We perform concept intervention using hierarchies in the `scripts/cem_scripts/CEM Intervention Experiments.ipynb` file. This requires a previously trained CEM model; instructions for this are in the <a href="https://github.com/mateoespinosa/cem/tree/main">CEM repository</a>. We additionally provide a pre-trained CEM model, with CUB, which we use for our intervention experiments <a href="https://drive.google.com/file/d/1bqoH2Xho5itQ4g_H59rwm8uG4EHYcCte/view?usp=sharing">here</a> with the config file <a href="https://drive.google.com/file/d/1Gryri_6tAPY1DRY93_TDB3FVIX58Y6Iw/view?usp=sharing">here</a>. To use these, run the following: 
+We perform concept intervention using hierarchies in the `scripts/cem_scripts/CEM Intervention Experiments.ipynb` file. This requires a previously trained CEM model; instructions for this are in the <a href="https://github.com/mateoespinosa/cem/tree/main">CEM repository</a>. We additionally provide a pre-trained CEM model, with CUB, which we use for our intervention experiments <a href="https://drive.google.com/file/d/1ILQkLwDw88bYRV7PnTnQZBcwASk0uA0m/view?usp=sharing">here</a> with the config file <a href="https://drive.google.com/file/d/1rJDESQTqIorr_LANijN0QPAUuSl0gd0n/view?usp=sharing">here</a>. To use these, run the following: 
 ```python
 config = joblib.load("models/ConceptEmbeddingModel_resnet34_fold_1_experiment_config.joblib")
 if config['weight_loss']:
