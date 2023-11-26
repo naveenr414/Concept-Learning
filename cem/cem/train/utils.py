@@ -2,8 +2,6 @@ import sklearn.metrics
 import numpy as np
 import torch
 import pytorch_lightning as pl
-from torchvision.models import densenet121
-
 
 ################################################################################
 ## HELPER FUNCTIONS
@@ -92,20 +90,6 @@ def compute_accuracy(
     y_f1 = 0.0
     return (y_accuracy, y_auc, y_f1)
 
-
-def wrap_pretrained_model(c_extractor_arch, pretrain_model=True):
-    def _result_x2c_fun(output_dim):
-        model = c_extractor_arch(pretrained=pretrain_model)
-        if output_dim:
-            if c_extractor_arch == densenet121:
-                model.classifier = torch.nn.Linear(
-                    1024,
-                    output_dim,
-                )
-            elif hasattr(model, 'fc'):
-                model.fc = torch.nn.Linear(512, output_dim)
-        return model
-    return _result_x2c_fun
 
 ################################################################################
 ## HELPER CLASSES

@@ -21,7 +21,7 @@ def embedding_homogeneity(
     # compute the maximum value for the AUC
     n_clusters = np.linspace(2, c_vec.shape[0], step).astype(int)
     max_auc = np.trapz(np.ones(step))
-
+    
     # for each concept:
     #   1. find clusters
     #   2. compare cluster assignments with ground truth concept/task labels
@@ -52,6 +52,8 @@ def embedding_homogeneity(
                 homogeneity_score(y_test, c_cluster_labels)
             )
 
+        print("Max auc {} concept homogeneity {}".format(max_auc,concept_homogeneity))
+            
         # compute the area under the curve
         concept_auc.append(np.trapz(np.array(concept_homogeneity)) / max_auc)
         task_auc.append(np.trapz(np.array(task_homogeneity)) / max_auc)

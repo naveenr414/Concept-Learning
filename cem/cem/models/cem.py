@@ -5,6 +5,7 @@ import numpy as np
 import os
 import sklearn.metrics
 from torchvision.models import resnet50
+import random
 
 ################################################################################
 ## HELPER LAYERS
@@ -110,6 +111,8 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         seed=-1,
         related_concepts=None,
         vae_model = None,
+        stratified_model = False,
+        limit=None,
     ):        
         pl.LightningModule.__init__(self)
         try:
@@ -150,8 +153,10 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         self.top_k_accuracy = top_k_accuracy
         self.intervention_idxs = intervention_idxs
         self.related_concepts = related_concepts
+        self.limit = limit
         self.adversarial_intervention = adversarial_intervention
         self.vae_model = vae_model
+        self.stratified_model = stratified_model
         for i in range(n_concepts):
             if embeding_activation is None:
                 self.concept_context_generators.append(
@@ -192,31 +197,56 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                         torch.nn.ReLU(),
                     ])
                 )
+                
+                
             if self.shared_prob_gen and (
                 len(self.concept_prob_generators) == 0
             ):
-                # Then we will use one and only one probability generator which
-                # will be shared among all concepts. This will force concept
-                # embedding vectors to be pushed into the same latent space
-                self.concept_prob_generators.append(
-                    torch.nn.Linear(
-                        2 * emb_size,
-                        1,
+                if self.stratified_model:
+                    # Use only the first half of each embedding to get probabilities 
+                    self.concept_prob_generators.append(
+                        torch.nn.Linear(
+                            emb_size,
+                            1,
+                        )
                     )
-                )
+                else:
+                    # Then we will use one and only one probability generator which
+                    # will be shared among all concepts. This will force concept
+                    # embedding vectors to be pushed into the same latent space
+                    self.concept_prob_generators.append(
+                        torch.nn.Linear(
+                            2 * emb_size,
+                            1,
+                        )
+                    )
             elif not self.shared_prob_gen:
-                self.concept_prob_generators.append(
-                    torch.nn.Linear(
-                        2 * emb_size,
-                        1,
+                if self.stratified_model:
+                    self.concept_prob_generators.append(
+                        torch.nn.Linear(
+                            emb_size,
+                            1,
+                        )
                     )
-                )
-        self.c2y_model = torch.nn.Sequential(*[
-            torch.nn.Linear(
-                n_concepts * (emb_size + int(concat_prob)),
-                n_tasks,
-            ),
-        ])
+                else:
+                    self.concept_prob_generators.append(
+                        torch.nn.Linear(
+                            2 * emb_size,
+                            1,
+                        )
+                    )
+                
+        if self.stratified_model:
+            # Go from the emb_size/2 to n_tasks 
+            self.c2y_model = torch.nn.Sequential(*[
+                torch.nn.Linear(emb_size//2+int(concat_prob),n_tasks)])
+        else:
+            self.c2y_model = torch.nn.Sequential(*[
+                torch.nn.Linear(
+                    n_concepts * (emb_size + int(concat_prob)),
+                    n_tasks,
+                ),
+            ])
         self.sig = torch.nn.Sigmoid()
 
         self.loss_concept = torch.nn.BCELoss(weight=weight_loss)
@@ -277,7 +307,15 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         elif concept_idx not in intervention_idxs and self.related_concepts != None and concept_idx in self.related_concepts:
             if any(key in intervention_idxs for key in self.related_concepts[concept_idx].keys()):
                 full_prob = 0
-                for reference_concept in self.related_concepts[concept_idx]: 
+                num_tot = 0
+                
+                potential_concepts = [i for i in self.related_concepts[concept_idx] if i in intervention_idxs]
+                random.shuffle(potential_concepts)
+                
+                if self.limit != None:
+                    potential_concepts = potential_concepts[:self.limit]
+                
+                for reference_concept in potential_concepts: 
                     function, confidence = self.related_concepts[concept_idx][reference_concept]
                     true_concept_value = function(c_true[:,reference_concept:reference_concept+1])
                     full_prob +=  (
@@ -290,8 +328,9 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                             -self.inactive_intervention_values[concept_idx]
                         )
                     )
+                    num_tot += 1
 
-                full_prob /= len(self.related_concepts[concept_idx].keys())
+                full_prob /= len(potential_concepts)
                 prob = full_prob * confidence + (1-confidence)*prob
             return prob
             
@@ -311,6 +350,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         return result
     
     def _forward(self, x, intervention_idxs=None, c=None, train=False):
+        # Run Resnet over the dataset
         pre_c = self.pre_concept_model(x)
         probs = []
         full_vectors = []
@@ -323,11 +363,22 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 prob_gen = self.concept_prob_generators[0]
             else:
                 prob_gen = self.concept_prob_generators[i]
+                
+            # Get concepts from there using the concept generator
             context = context_gen(pre_c)
             
             if self.sigmoidal_embedding:
                 context = self.sig(context)
-            prob = prob_gen(context)
+                
+            # From the concept get the probability
+            if self.stratified_model:
+                # Use only the first half of the positive and negative context
+                index_positive = [i for i in range(self.emb_size//2)]
+                index_negative = [i+self.emb_size for i in range(self.emb_size//2)]
+                context_prob = context[:,index_positive+index_negative]
+                prob = prob_gen(context_prob)
+            else:
+                prob = prob_gen(context)
             sem_probs.append(self.sig(prob))
             if self.sigmoidal_prob:
                 prob = self.sig(prob)
@@ -345,6 +396,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             
             all_contexts.append(context)
             
+            # TODO: Make sure that we analyze only the non-probability part of the embedding 
             # Write which concepts were used to compute outputs
             if not train and c != None:
                 self.update_concepts(context,self.emb_size,c,i)
@@ -354,18 +406,39 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             
             mask = prob if self.sigmoidal_prob else self.sig(prob)
             context = context_pos * mask + context_neg * (1 - mask)
-            if self.concat_prob:
-                # Then the probability bit will be added
-                # as part of the bottleneck
-                full_vectors.append(torch.cat(
-                    [context, probs[i]],
-                    axis=-1,
-                ))
-            else:
-                # Otherwise, let's completely ignore the probability bit
-                full_vectors.append(context)
+                
+            if self.stratified_model:
+                non_probability_indices = []
+                non_probability_indices += [i for i in range(self.emb_size//2,self.emb_size)]
+                if self.concat_prob:
+                    # Then the probability bit will be added
+                    # as part of the bottleneck
+                    full_vectors.append(torch.cat(
+                        [context[:,non_probability_indices], probs[i]],
+                        axis=-1,
+                    ))
+                else:
+                    # Otherwise, let's completely ignore the probability bit
+                    full_vectors.append(context[:,non_probability_indices])
+            else:      
+                if self.concat_prob:
+                    # Then the probability bit will be added
+                    # as part of the bottleneck
+                    full_vectors.append(torch.cat(
+                        [context, probs[i]],
+                        axis=-1,
+                    ))
+                else:
+                    # Otherwise, let's completely ignore the probability bit
+                    full_vectors.append(context)
+                
         c_sem = torch.cat(sem_probs, axis=-1)
-        c_pred = torch.cat(full_vectors, axis=-1)
+        
+        if self.stratified_model:
+            c_pred = torch.stack(full_vectors, dim=0)
+            c_pred = torch.sum(c_pred,dim=0)
+        else:
+            c_pred = torch.cat(full_vectors, axis=-1)
         
         # Ours: Interevene with VAE Models
         if self.vae_model is not None:

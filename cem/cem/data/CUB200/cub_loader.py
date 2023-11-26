@@ -199,6 +199,7 @@ def load_data(
     num_workers=1,
     concept_transform=None,
     path_transform=None,
+    is_training=True,
 ):
     """
     Note: Inception needs (299,299,3) images with inputs scaled between -1 and 1
@@ -206,7 +207,7 @@ def load_data(
     NOTE: resampling is customized for first attribute only, so change sampler.py if necessary
     """
     resized_resol = int(resol * 256/224)
-    is_training = any(['train.pkl' in f for f in pkl_paths])
+    is_training = any(['train.pkl' in f for f in pkl_paths]) and is_training
     if is_training:
         transform = transforms.Compose([
             #transforms.Resize((resized_resol, resized_resol)),
