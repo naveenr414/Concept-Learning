@@ -20,7 +20,9 @@ import time
 from sklearn.decomposition import PCA
 import pandas as pd 
 import os
+import shutil
 
+image_dir = "../../cem/cem/images"
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
         return np.array([224,224,3])
@@ -122,13 +124,15 @@ def create_tcav_dataset(attribute_name,dataset,num_random_exp,
         attribute_name,num_random_exp,dataset.get_images_without_attribute,
         images_per_folder=images_per_folder,seed=seed,suffix=suffix)
     
-    concepts = [attribute_name]
+    concepts = ["{}_{}_{}".format(attribute_name,seed,suffix)]
     target = "zebra"
     alphas = [0.1]
     
     create_tcav_vectors(concepts,target,model_name,bottlenecks,
                         num_random_exp,experiment_name=experiment_name,
                         alphas=[0.1],seed=seed,max_examples=max_examples)
+
+    
 
     
 def load_activations_model(experiment_name,max_examples,model_name,sess):
@@ -144,7 +148,6 @@ def load_activations_model(experiment_name,max_examples,model_name,sess):
         Object from ImageActivationGenerator
     """
     
-    image_dir = "./dataset/images"
     activation_dir = './results/activations'
     models_used = ["GoogleNet",
                    "Resnet50","Resnet50Robustness","Resnet50Responsiveness",
@@ -300,8 +303,22 @@ def create_tcav_vectors(concepts,target,model_name,bottlenecks,num_random_exp,ex
         mytcav._process_what_to_run_expand(num_random_exp=num_random_exp+1)
         mytcav.params = mytcav.get_params()
 
-        mytcav.run(run_parallel=False)
+        mytcav.run(run_parallel=False,num_workers=1)
         delete_previous_activations(bottlenecks[0],concepts)
+        delete_previous_images(concepts)
+
+def delete_previous_images(concepts):
+    for c in concepts:
+        directory = image_dir+"/{}".format(c)
+        try:
+        # Use shutil.rmtree() to delete the directory and its contents
+            shutil.rmtree(directory)
+        except FileNotFoundError:
+            print(f"Directory not found: {directory}")
+        except Exception as e:
+            print(f"Error deleting directory: {e}")
+
+
 def create_model_vectors(attributes,dataset,suffix,seed=-1):
     """Develop concept vectors based on a model representation
     
@@ -448,8 +465,6 @@ if __name__ == "__main__":
     
     
     # TCAV Arguments
-    parser.add_argument('--class_name', type=str, default='',
-                        help='Name of the ImageNet class for which concept vectors are generated.')
     parser.add_argument('--target', type=str,
                         help='Target which the concept vectors are aiming to predict.',default='zebra')
     parser.add_argument('--model_name', type=str,
@@ -460,7 +475,7 @@ if __name__ == "__main__":
                         help='Layer of model used when training concept vectors; activations are taken from this',
                         default='block4_conv1')
     parser.add_argument('--num_random_exp', type=int,
-                        help='Number of random ImageNet classes we compare the concept vector with')
+                        help='Number of random ImageNet classes we compare the concept vector with',default=10)
     parser.add_argument('--images_per_folder',type=int, default=50,
                         help='Number of images in each random random folder')
 
@@ -487,10 +502,12 @@ if __name__ == "__main__":
         if args.dataset == 'imagenet':
             create_tcav_vectors([args.class_name],args.target,args.model_name[args.bottleneck],
                                 args.num_random_exp,alphas=[args.alpha],seed=args.seed)
-        else:        
-            create_tcav_dataset(args.class_name,dataset,
-                                args.num_random_exp,args.images_per_folder,
-                                seed=args.seed,suffix=args.suffix,model_name=args.model_name,bottlenecks=[args.bottleneck])
+        else:
+            for attribute in dataset.get_attributes():
+                print("On attribute {}".format(attribute))
+                create_tcav_dataset(attribute,dataset,
+                                    args.num_random_exp,args.images_per_folder,
+                                    seed=args.seed,suffix=args.suffix)
     elif args.algorithm == 'model':
         attributes = dataset.get_attributes()
         create_model_vectors(attributes,dataset,args.suffix,args.seed)

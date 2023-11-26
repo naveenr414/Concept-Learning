@@ -1,4 +1,4 @@
-from scipy.cluster.hierarchy import dendrogram, linkage, ward
+from scipy.cluster.hierarchy import dendrogram, linkage, ward, single, complete
 from sklearn.cluster import AgglomerativeClustering
 from scipy.spatial.distance import pdist, cdist
 from scipy.sparse.csgraph import minimum_spanning_tree
@@ -238,6 +238,31 @@ def create_ward_hierarchy(data,metric='euclidean'):
     
     return ward(data)
 
+def create_min_hierarchy(data,metric='euclidean'):
+    """Use the sklearn single function to construct a hierarchal cluster
+    
+    Arguments:
+        data: Numpy array of data/array of numpy vectors
+
+    Returns: 
+        numpy array with information on how to construct a dendogram
+    """
+    
+    return single(data)
+
+def create_max_hierarchy(data,metric='euclidean'):
+    """Use the sklearn complete function to construct a hierarchal cluster
+    
+    Arguments:
+        data: Numpy array of data/array of numpy vectors
+
+    Returns: 
+        numpy array with information on how to construct a dendogram
+    """
+    
+    return complete(data)
+
+
 def create_linkage_hierarchy(data,method='single',metric='euclidean'):
     """Use the sklearn linkage function to construct a hierarchal cluster
     
@@ -324,7 +349,7 @@ def flat_distance_to_square(distance_matrix):
     return new_distances
 
 
-def get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed):
+def get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed,metric='euclidean'):
     """Compute a numpy distance matrix between every pair of concepts
     
     Arguments:
@@ -352,7 +377,7 @@ def get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed
             embeddings_i = embeddings_by_attribute[attributes[i]]
             embeddings_j = embeddings_by_attribute[attributes[j]]
             
-            all_pairwise_distances = sklearn.metrics.pairwise_distances(embeddings_i,embeddings_j)
+            all_pairwise_distances = sklearn.metrics.pairwise_distances(embeddings_i,embeddings_j,metric=metric)
             distance = np.mean(all_pairwise_distances)
             distance_matrix.append(distance)
     
@@ -360,7 +385,7 @@ def get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed
     
     return distance_matrix
 
-def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed):
+def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attributes,random_seed,metric='euclidean'):
     """Create a hierarchy from a set of embeddings and a dataset
     Do this by first creating a distance matrix (pdist-style), then feeding it into hierarchy_method
     
@@ -377,7 +402,7 @@ def create_hierarchy(hierarchy_method, embedding_method,dataset,suffix,attribute
         Hierarchy from the Hierarchy class
     """
     
-    distance_matrix = get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed)    
+    distance_matrix = get_concept_distances(embedding_method,dataset,suffix,attributes,random_seed,metric=metric)    
     dendrogram = hierarchy_method(distance_matrix)
     h = Hierarchy()
     h.from_array(dendrogram,attributes)

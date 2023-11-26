@@ -220,7 +220,7 @@ def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="re
     file_location+="/{}_concept_{}_active.npy".format(experiment_name,concept_number)
     return np.load(open(file_location,"rb"))
 
-def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alphas=[0.1]):
+def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alphas=[0.1],suffix=''):
     """Loads all the TCAV vectors for a given concept + bottleneck combination
     
     Arguments:
@@ -247,14 +247,14 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     
     for bottleneck in bottlenecks:
         for alpha in alphas:
-            file_name_pattern = "{}-random*-{}-linear-{}.pkl".format(concept,bottleneck,alpha)
+            file_name_pattern = "{}_{}_{}-random*-{}-linear-{}.pkl".format(concept,seed,suffix,bottleneck,alpha)
             all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
             if len(all_matching_files) == 0:
                 print(concept)
                                         
             for file_name in all_matching_files:
                 temp_concept = concept.replace("(","\(").replace(")","\)")
-                re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,bottleneck,alpha),file_name)
+                re_search = re.search('{}_{}_{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,seed,suffix,bottleneck,alpha),file_name)
                 random_concept = re_search.group(1)
                 concept_meta_info.append({'alpha': alpha,'bottleneck':
                                           bottleneck, 'random_concept': int(random_concept), 'concept': concept})
@@ -285,7 +285,7 @@ def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
        Numpy array of TCAV vectors
     """
         
-    return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed)[0]
+    return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed,suffix=suffix)[0]
 
 def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
     """Generate sparse concept vectors, by looking at whether a concept is present in a data point

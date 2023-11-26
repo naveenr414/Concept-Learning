@@ -21,6 +21,8 @@ We provide the bulk of the code in this repository. However, to run concept inte
 To install dependencies, run the following
 ```
 $ conda env create --file environment.yaml
+$ pip install zss
+$ pip install tcav 
 ```
 
 ### Datasets

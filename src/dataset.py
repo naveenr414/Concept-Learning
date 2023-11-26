@@ -7,6 +7,9 @@ import random
 import glob
 from PIL import Image
 from copy import deepcopy
+
+dataset_folder = "../../cem/cem"
+
 class Dataset:
     def get_attributes(self):
         pass
@@ -101,10 +104,10 @@ class Dataset:
     
 class MNIST_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = "dataset/colored_mnist{}/images/train.pkl"
-        self.test_pkl_path = "dataset/colored_mnist{}/images/val.pkl"
-        self.path_to_image = lambda path: "dataset/"+path
-        self.all_files = "dataset/colored_mnist/images/*/*.png"
+        self.pkl_path = dataset_folder+"/colored_mnist{}/images/train.pkl"
+        self.test_pkl_path = dataset_folder+"/colored_mnist{}/images/val.pkl"
+        self.path_to_image = lambda path: dataset_folder+"/"+path
+        self.all_files = dataset_folder+"/colored_mnist/images/*/*.png"
         self.root_folder_name = "colored_mnist"
         self.experiment_name = "mnist"
         
@@ -137,10 +140,10 @@ class MNIST_Dataset(Dataset):
     
 class DSprites_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = "dataset/dsprites{}/preprocessed/train.pkl"
-        self.test_pkl_path = "dataset/dsprites{}/preprocessed/val.pkl"
-        self.path_to_image = lambda path: "dataset/"+path
-        self.all_files = "dataset/dsprites/images/*.png"
+        self.pkl_path = dataset_folder+"/dsprites{}/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/dsprites{}/preprocessed/val.pkl"
+        self.path_to_image = lambda path: dataset_folder+"/"+path
+        self.all_files = dataset_folder+"/dsprites/images/*.png"
         self.root_folder_name = "dsprites"
         self.experiment_name = "dsprites"
         self.class_names = [str(i) for i in range(100)]
@@ -176,10 +179,10 @@ class DSprites_Dataset(Dataset):
     
 class Chexpert_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = "dataset/chexpert{}/preprocessed/train.pkl"
-        self.test_pkl_path = "dataset/chexpert{}/preprocessed/val.pkl"
-        self.path_to_image = lambda path: "dataset/"+path
-        self.all_files = "dataset/chexpert/images/*/study1/*.jpg"
+        self.pkl_path = dataset_folder+"/chexpert{}/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/chexpert{}/preprocessed/val.pkl"
+        self.path_to_image = lambda path: dataset_folder+"/"+path
+        self.all_files = dataset_folder+"/chexpert/images/*/study1/*.jpg"
         self.root_folder_name = "chexpert"
         self.experiment_name = "chexpert"
         self.class_names = ["Findings","No Findings"]
@@ -208,18 +211,18 @@ class Chexpert_Dataset(Dataset):
 
 class CUB_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = "dataset/CUB{}/preprocessed/train.pkl"
-        self.test_pkl_path = "dataset/CUB{}/preprocessed/val.pkl"
-        self.path_to_image = lambda path: "dataset/"+path
-        self.all_files = "dataset/CUB/images/CUB_200_2011/images/*/*.jpg"
+        self.pkl_path = dataset_folder+"/CUB{}/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/CUB{}/preprocessed/val.pkl"
+        self.path_to_image = lambda path: dataset_folder+"/"+path
+        self.all_files = dataset_folder+"/CUB/images/CUB_200_2011/images/*/*.jpg"
         self.root_folder_name = "CUB"
         self.experiment_name = "cub"
         
-        self.class_names = open("dataset/CUB/metadata/classes.txt").read().strip().split("\n")
+        self.class_names = open(dataset_folder+"/CUB/metadata/classes.txt").read().strip().split("\n")
         self.class_names = [i.split(" ")[1] for i in self.class_names]
     
     def get_attributes(self):
-        attributes_file = "dataset/CUB/metadata/attributes.txt"
+        attributes_file = dataset_folder+"/CUB/metadata/attributes.txt"
         lines = open(attributes_file).read().strip().split("\n")
         attributes = [i.split(" ")[1] for i in lines]
         return attributes
@@ -389,7 +392,7 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
     
     for folder_num in range(num_folders):
         image_locations = attribute_antifunction(attribute_name,suffix=suffix,seed=seed)
-        folder_location = "dataset/images/random500_{}".format(folder_num)
+        folder_location = dataset_folder+"/images/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
             os.mkdir(folder_location)
         delete_files_in_directory(folder_location)
@@ -422,7 +425,7 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     
     image_locations = attribute_function(attribute_name,suffix=suffix,seed=seed,train=train)
     
-    folder_location = "dataset/images/{}".format(attribute_name)
+    folder_location = dataset_folder+"/images/{}_{}_{}".format(attribute_name,seed,suffix)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)
         
@@ -438,7 +441,6 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     for image in image_locations:
         shutil.copy2(image,folder_location)
         
-
 
 def generate_random_orientation(n):
     """Generate n random orientations based on concepts
@@ -505,13 +507,13 @@ def write_image(idx,imgs):
     
     Returns: Nothing
     
-    Side Effects: Writes an image to dataset/dsprites/images/idx.png
+    Side Effects: Writes an image to dataset_folder + /dsprites/images/idx.png
     """
     
     bw_arr = imgs[idx]
     rgb_arr = np.repeat(np.expand_dims(bw_arr, axis=2), 3, axis=2) * 255
     img = Image.fromarray(rgb_arr.astype('uint8'), 'RGB')
-    img.save('dataset/dsprites/images/{}.png'.format(idx))
+    img.save(dataset_folder+'/dsprites/images/{}.png'.format(idx))
     
 def one_hot_orientation(orientation):
     """Given some orientation, one hot encode it
@@ -577,14 +579,14 @@ def write_dataset(orientations,npz_file, write_images=False):
         'test': num_test,
     }
     
-    files = glob.glob('dataset/dsprites/images/*')
+    files = glob.glob(dataset_folder+'/dsprites/images/*')
     for f in files:
         os.remove(f)
 
     
     for split in ["train","val","test"]:
         pkl_file_info = []
-        pkl_file_loc = "dataset/dsprites/preprocessed/{}.pkl".format(split)
+        pkl_file_loc = dataset_folder+"/dsprites/preprocessed/{}.pkl".format(split)
         
         low, high = num_split[split]
         
@@ -607,7 +609,7 @@ def write_dataset(orientations,npz_file, write_images=False):
         w.close()
         
 def write_ten_dsprites():
-    npz_file = np.load(open("dataset/dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz","rb"))
+    npz_file = np.load(open(dataset_folder+"/dsprites/dsprites_ndarray_co1sh3sc6or40x32y32_64x64.npz","rb"))
     oreintations = generate_random_orientations(10)
     write_dataset(orientations,npz_file, write_images=True)
 

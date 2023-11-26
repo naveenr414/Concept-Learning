@@ -16,3 +16,5 @@ dataset/*/images
 dataset/models/
 dataset/images
 !dataset/*/preprocessed
+runs
+build
