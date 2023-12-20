@@ -529,7 +529,7 @@ def save_concept_vectors(method,dataset,seed,file_name):
     Side Effects: Saves all concept_vectors to results/concept_vectors/file_name.npy
     """
     
-    directory = "results/concept_vectors"
+    directory = "intermediary/intervention_hierarchies/{}".format(dataset.root_folder_name)
     
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -540,9 +540,10 @@ def save_concept_vectors(method,dataset,seed,file_name):
     
     for a in attributes:
         vectors = method(a,dataset,"",seed=seed)
-        vectors = np.mean(vectors,dim=1)
+        vectors = np.mean(vectors,axis=0)
         all_vectors.append(vectors)
     all_vectors = np.array(all_vectors)
+    print(all_vectors.shape)
     
-    np.save(all_vectors,open("{}/{}.npy".format(directory,file_name),"wb"))
+    np.save(open("{}/{}.npy".format(directory,file_name),"wb"),all_vectors)
     

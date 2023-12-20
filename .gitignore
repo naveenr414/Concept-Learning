@@ -21,3 +21,6 @@ build
 models/
 intermediary/
 results/bases
+results/evaluation
+cem/results/
+cem/cem_concepts/

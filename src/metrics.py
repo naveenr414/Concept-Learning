@@ -296,8 +296,9 @@ def get_model_concept_similarities(dataset,model):
     num_attributes = len(dataset.get_data()[0]['attribute_label'])
     
     data_valid = dataset.get_data(train=False)
-    img_paths_valid = ['dataset/'+i['img_path'] for i in data_valid]
+    img_paths_valid = ['../../datasets/'+i['img_path'].replace("CUB_200_2011/images/","") for i in data_valid]
     labels_valid = [str(i['class_label']) for i in data_valid]
+
     valid_df = pd.DataFrame(zip(img_paths_valid,labels_valid), columns=["image_path", "label"])
 
     valid_generator = datagen.flow_from_dataframe(dataframe=valid_df,
@@ -340,16 +341,19 @@ def truthfulness_metric_shapley(embedding_method,dataset,attributes,random_seeds
     # For MNIST, only the closest concept matters
     if dataset.experiment_name == "mnist":
         compare_concepts = 1
-    
-    num_classes = len(set([i['class_label'] for i in dataset.get_data()]))
-    
+        
     avg_truthfulness = []
     
-    model = get_large_image_model(dataset,model_name)
-    model.load_weights("results/models/{}_models/{}_42.h5".format(model_name.lower(),dataset.experiment_name))
-    
-    similarity_matrix = get_model_concept_similarities(dataset,model)
-    
+    if os.path.exists("intermediary/truthfulness/{}.npy".format(dataset.experiment_name)):
+        similarity_matrix = np.load(open("intermediary/truthfulness/{}.npy".format(dataset.experiment_name),"rb"))
+
+    else:
+        model = get_large_image_model(dataset,model_name)
+        model.load_weights("models/{}_models/{}_42.h5".format(model_name.lower(),dataset.experiment_name))
+
+        similarity_matrix = get_model_concept_similarities(dataset,model)
+        np.save(open("intermediary/truthfulness/{}.npy".format(dataset.experiment_name),"wb"),similarity_matrix)
+
     for seed in random_seeds:  
         random.seed(seed)
         np.random.seed(seed)
@@ -434,10 +438,18 @@ def truthfulness_metric(embedding_method,dataset,attributes,random_seeds,model="
 
 def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="VGG16",eval_truthfulness=True,metrics=[],metric_names=[]):
     if metrics == []:
-        metrics = [stability_metric, robustness_image_metric,responsiveness_image_metric]
-        metric_names = ['Stability', 'Image Robustness', 'Image Responsiveness']
+        metrics = [robustness_image_metric,responsiveness_image_metric,stability_metric]
+        metric_names = ['Image Robustness', 'Image Responsiveness','Stability']
             
     results = {}
+
+    if eval_truthfulness:
+        results['Truthfulness'] = truthfulness_metric_shapley(embedding_method,
+                        dataset,
+                        attributes,
+                        random_seeds)
+        print("{}: {}".format("Truthfulness",results['Truthfulness']))
+
     for metric,name in zip(metrics,metric_names):
         score = metric(embedding_method,
                         dataset,
@@ -445,13 +457,6 @@ def compute_all_metrics(embedding_method,dataset,attributes,random_seeds,model="
                         random_seeds)
         print("{}: {}".format(name, score))
         results[name] = score
-    
-    if eval_truthfulness:
-        results['Truthfulness'] = truthfulness_metric_shapley(embedding_method,
-                        dataset,
-                        attributes,
-                        random_seeds)
-        print("{}: {}".format("Truthfulness",results['Truthfulness']))
         
     return results
 

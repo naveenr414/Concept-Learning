@@ -115,8 +115,7 @@ class CUBDataset(Dataset):
         img_path = img_data['img_path']
         if self.path_transform != None:
             img_path = self.path_transform(img_path)
-                
-        img_path = self.root_dir + '/' + img_path
+
         img = Image.open(img_path).convert('RGB')
         class_label = img_data['class_label']
         if self.transform:

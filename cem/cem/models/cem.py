@@ -330,8 +330,11 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                     )
                     num_tot += 1
 
+
                 full_prob /= len(potential_concepts)
                 prob = full_prob * confidence + (1-confidence)*prob
+            
+
             return prob
             
         c_true = self._switch_concepts(c_true)
@@ -371,14 +374,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 context = self.sig(context)
                 
             # From the concept get the probability
-            if self.stratified_model:
-                # Use only the first half of the positive and negative context
-                index_positive = [i for i in range(self.emb_size//2)]
-                index_negative = [i+self.emb_size for i in range(self.emb_size//2)]
-                context_prob = context[:,index_positive+index_negative]
-                prob = prob_gen(context_prob)
-            else:
-                prob = prob_gen(context)
+            prob = prob_gen(context)
             sem_probs.append(self.sig(prob))
             if self.sigmoidal_prob:
                 prob = self.sig(prob)
@@ -389,6 +385,8 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 c_true=c,
                 train=train,
             )
+            print("Prob shape {}".format(prob.shape))
+
             probs.append(prob)
             # Then time to mix!
             context_pos = context[:, :self.emb_size]
@@ -407,55 +405,23 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             mask = prob if self.sigmoidal_prob else self.sig(prob)
             context = context_pos * mask + context_neg * (1 - mask)
                 
-            if self.stratified_model:
-                non_probability_indices = []
-                non_probability_indices += [i for i in range(self.emb_size//2,self.emb_size)]
-                if self.concat_prob:
-                    # Then the probability bit will be added
-                    # as part of the bottleneck
-                    full_vectors.append(torch.cat(
-                        [context[:,non_probability_indices], probs[i]],
-                        axis=-1,
-                    ))
-                else:
-                    # Otherwise, let's completely ignore the probability bit
-                    full_vectors.append(context[:,non_probability_indices])
-            else:      
-                if self.concat_prob:
-                    # Then the probability bit will be added
-                    # as part of the bottleneck
-                    full_vectors.append(torch.cat(
-                        [context, probs[i]],
-                        axis=-1,
-                    ))
-                else:
-                    # Otherwise, let's completely ignore the probability bit
-                    full_vectors.append(context)
+    
+            if self.concat_prob:
+                # Then the probability bit will be added
+                # as part of the bottleneck
+                full_vectors.append(torch.cat(
+                    [context, probs[i]],
+                    axis=-1,
+                ))
+            else:
+                # Otherwise, let's completely ignore the probability bit
+                full_vectors.append(context)
                 
         c_sem = torch.cat(sem_probs, axis=-1)
+        c_pred = torch.cat(full_vectors, axis=-1)
         
-        if self.stratified_model:
-            c_pred = torch.stack(full_vectors, dim=0)
-            c_pred = torch.sum(c_pred,dim=0)
-        else:
-            c_pred = torch.cat(full_vectors, axis=-1)
-        
-        # Ours: Interevene with VAE Models
-        if self.vae_model is not None:
-            batch_size = c_pred.shape[0]
-            attributes = len(self.concept_context_generators)
-            embedding_size = c_pred.shape[1]//attributes
-            
-            temp_c_pred = c_pred.reshape((batch_size*embedding_size,attributes))
-            
-            encoded_image = self.vae_model.decoder.predict(temp_c_pred.detach().numpy())
-            re_decoded_image = self.vae_model.encoder.predict(encoded_image)[2]
-            c_pred = torch.Tensor(re_decoded_image).reshape(batch_size,attributes*embedding_size)
-
         y = self.c2y_model(c_pred)
-        
-        sizes = [i.size() for i in all_contexts]
-        
+                
         contexts = torch.stack(all_contexts)
                 
         return c_sem, c_pred, y, contexts
@@ -471,6 +437,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                     c=c,
                     train=train,
                 )
+
             else:
                 c_sem, c_logits, y_logits,context = self._forward(
                     x,
@@ -504,6 +471,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             
         # Ours: Train with concept pair loss weight
         concept_pair_loss_weight = self.concept_pair_loss_weight
+        print("Concept pair loss weight {}".format(concept_pair_loss_weight))
         if concept_pair_loss_weight != 0:
             concept_pair_loss = 0
             

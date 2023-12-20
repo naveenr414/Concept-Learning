@@ -3,14 +3,10 @@ from keras.models import Sequential, Model
 from keras.layers import Embedding, Reshape, Activation, Input, Dense, Flatten, Dot
 from keras.optimizers import Adam
 from keras.models import Model
-from keras.utils import np_utils
 from keras.applications.vgg16 import VGG16
 from keras.applications import ResNet50
 from keras.applications import InceptionV3
 from keras.preprocessing.image import ImageDataGenerator
-from keras.utils.data_utils import get_file
-from keras.preprocessing.text import Tokenizer
-from keras.preprocessing.sequence import skipgrams
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers

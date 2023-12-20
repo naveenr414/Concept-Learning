@@ -22,7 +22,7 @@ import pandas as pd
 import os
 import shutil
 
-image_dir = "../../cem/cem/images"
+image_dir = "../../datasets/imagenet"
 class ResnetWrapper(model.KerasModelWrapper):
     def get_image_shape(self):
         return np.array([224,224,3])
@@ -171,17 +171,17 @@ def load_activations_model(experiment_name,max_examples,model_name,sess):
                                         LABEL_PATH)
     elif "VGG16" in model_name:
         if model_name == "VGG16":
-            GRAPH_PATH = './dataset/models/keras/model_vgg16.h5'
+            GRAPH_PATH = './models/vgg16_models/model_vgg16.h5'
         elif model_name == "VGG16Robustness":
             GRAPH_PATH = './dataset/models/keras/model_vgg16_robust.h5'
         elif model_name == "VGG16Responsiveness":
             GRAPH_PATH = './dataset/models/keras/model_vgg16_responsive.h5'
             
-        LABEL_PATH = "./dataset/models/inception5h/imagenet_comp_graph_label_strings.txt"
+        LABEL_PATH = "../../datasets/imagenet/imagenet_comp_graph_label_strings.txt"
         mymodel = VGGWrapper(sess,
                                         GRAPH_PATH,
                                         LABEL_PATH)
-        
+
     act_generator = act_gen.ImageActivationGenerator(mymodel, image_dir, activation_dir,max_examples=max_examples)
     return act_generator
     
@@ -242,7 +242,7 @@ def reset_tcav_vectors(concepts,num_random_exp,experiment_name,seed,bottleneck,a
     Side Effects: Deletes all CAVs in a folder
     """
     
-    cav_dir = './results/cavs/{}/{}'.format(experiment_name,seed)
+    cav_dir = './results/bases/tcav/{}/{}'.format(experiment_name,seed)
     
     for concept in concepts:
         for i in range(num_random_exp):
@@ -504,10 +504,11 @@ if __name__ == "__main__":
                                 args.num_random_exp,alphas=[args.alpha],seed=args.seed)
         else:
             for attribute in dataset.get_attributes():
-                print("On attribute {}".format(attribute))
-                create_tcav_dataset(attribute,dataset,
-                                    args.num_random_exp,args.images_per_folder,
-                                    seed=args.seed,suffix=args.suffix)
+                if attribute not in ["is_white","is_scale_0.9"]: # Attributes that aren't singletons 
+                    print("On attribute {}".format(attribute))
+                    create_tcav_dataset(attribute,dataset,
+                                        args.num_random_exp,args.images_per_folder,
+                                        seed=args.seed,suffix=args.suffix)
     elif args.algorithm == 'model':
         attributes = dataset.get_attributes()
         create_model_vectors(attributes,dataset,args.suffix,args.seed)

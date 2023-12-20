@@ -506,6 +506,7 @@ def load_trained_model(
             config=config,
             imbalance=imbalance,
         )
+
         model.load_state_dict(torch.load(model_saved_path))
         trainer = pl.Trainer(
             gpus=gpu,
@@ -568,6 +569,7 @@ def load_trained_model(
         inactive_intervention_values=inactive_intervention_values,
         c2y_model=c2y_model,
     )
+
 
     model.load_state_dict(torch.load(model_saved_path))
     return model

@@ -8,7 +8,7 @@ import glob
 from PIL import Image
 from copy import deepcopy
 
-dataset_folder = "../../cem/cem"
+dataset_folder = "../../datasets"
 
 class Dataset:
     def get_attributes(self):
@@ -18,6 +18,11 @@ class Dataset:
         if suffix == "_model_robustness" or suffix == "_model_responsiveness":
             suffix = ""
             
+        if suffix == "_image_robustness":
+            suffix = "robustness/"
+        elif suffix == "_image_responsiveness":
+            suffix = "responsiveness/"
+
         if train:
             file_name = self.pkl_path.format(suffix)
         else:
@@ -104,8 +109,8 @@ class Dataset:
     
 class MNIST_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = dataset_folder+"/colored_mnist{}/images/train.pkl"
-        self.test_pkl_path = dataset_folder+"/colored_mnist{}/images/val.pkl"
+        self.pkl_path = dataset_folder+"/{}colored_mnist/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/{}colored_mnist/preprocessed/val.pkl"
         self.path_to_image = lambda path: dataset_folder+"/"+path
         self.all_files = dataset_folder+"/colored_mnist/images/*/*.png"
         self.root_folder_name = "colored_mnist"
@@ -128,7 +133,6 @@ class MNIST_Dataset(Dataset):
         for i in range(10):
             attributes += ["{}_color".format(i),"{}_number".format(i)]
 
-        attributes += ["spurious"]
         return attributes
 
     def fix_path(self,path,suffix):
@@ -140,8 +144,8 @@ class MNIST_Dataset(Dataset):
     
 class DSprites_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = dataset_folder+"/dsprites{}/preprocessed/train.pkl"
-        self.test_pkl_path = dataset_folder+"/dsprites{}/preprocessed/val.pkl"
+        self.pkl_path = dataset_folder+"/{}dsprites/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/{}dsprites/preprocessed/val.pkl"
         self.path_to_image = lambda path: dataset_folder+"/"+path
         self.all_files = dataset_folder+"/dsprites/images/*.png"
         self.root_folder_name = "dsprites"
@@ -179,8 +183,8 @@ class DSprites_Dataset(Dataset):
     
 class Chexpert_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = dataset_folder+"/chexpert{}/preprocessed/train.pkl"
-        self.test_pkl_path = dataset_folder+"/chexpert{}/preprocessed/val.pkl"
+        self.pkl_path = dataset_folder+"/{}chexpert/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/{}chexpert/preprocessed/val.pkl"
         self.path_to_image = lambda path: dataset_folder+"/"+path
         self.all_files = dataset_folder+"/chexpert/images/*/study1/*.jpg"
         self.root_folder_name = "chexpert"
@@ -211,10 +215,10 @@ class Chexpert_Dataset(Dataset):
 
 class CUB_Dataset(Dataset):
     def __init__(self):
-        self.pkl_path = dataset_folder+"/CUB{}/preprocessed/train.pkl"
-        self.test_pkl_path = dataset_folder+"/CUB{}/preprocessed/val.pkl"
+        self.pkl_path = dataset_folder+"/{}CUB/preprocessed/train.pkl"
+        self.test_pkl_path = dataset_folder+"/{}CUB/preprocessed/val.pkl"
         self.path_to_image = lambda path: dataset_folder+"/"+path
-        self.all_files = dataset_folder+"/CUB/images/CUB_200_2011/images/*/*.jpg"
+        self.all_files = dataset_folder+"/CUB/images/*/*.jpg"
         self.root_folder_name = "CUB"
         self.experiment_name = "cub"
         
@@ -229,7 +233,7 @@ class CUB_Dataset(Dataset):
     
     def fix_path(self,path,suffix):
         file_loc = "/".join(path.split("/")[-2:])
-        new_path = "CUB{}/images/CUB_200_2011/images/{}".format(suffix,file_loc)
+        new_path = "CUB{}/images/{}".format(suffix,file_loc)
 
         return new_path
 
@@ -392,7 +396,8 @@ def create_random_folder_without_attribute(attribute_name, num_folders, attribut
     
     for folder_num in range(num_folders):
         image_locations = attribute_antifunction(attribute_name,suffix=suffix,seed=seed)
-        folder_location = dataset_folder+"/images/random500_{}".format(folder_num)
+
+        folder_location = dataset_folder+"/imagenet/random500_{}".format(folder_num)
         if not os.path.isdir(folder_location):
             os.mkdir(folder_location)
         delete_files_in_directory(folder_location)
@@ -425,7 +430,7 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     
     image_locations = attribute_function(attribute_name,suffix=suffix,seed=seed,train=train)
     
-    folder_location = dataset_folder+"/images/{}_{}_{}".format(attribute_name,seed,suffix)
+    folder_location = dataset_folder+"/imagenet/{}_{}_{}".format(attribute_name,seed,suffix)
     if not os.path.isdir(folder_location):
         os.mkdir(folder_location)
         
@@ -439,7 +444,9 @@ def create_folder_from_attribute(attribute_name,attribute_function,seed=-1,suffi
     
     # Copy each image in image_locations to the folder
     for image in image_locations:
-        shutil.copy2(image,folder_location)
+        file_extension = image.split(".")[-1]
+        rand_name = "".join([str(random.randint(0,9)) for i in range(32)])
+        shutil.copy2(image,folder_location+"/{}.{}".format(rand_name,file_extension))
         
 
 def generate_random_orientation(n):

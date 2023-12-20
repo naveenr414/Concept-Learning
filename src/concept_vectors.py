@@ -193,7 +193,7 @@ def fix_predictions(method,dataset,seed,
     np.save(open(output_valid,"wb"),valid_predict_concept_proba)
     np.save(open(output_test,"wb"),test_predict_concept_proba)
 
-def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="results/cem_concepts"):
+def load_cem_vectors(experiment_name,concept_number,seed=-1,dataset_location="results/bases/cem"):
     """Load all the 'active' embeddings from Concept Embedding Models
     
     Arguments:
@@ -235,30 +235,48 @@ def load_tcav_vectors(concept,bottlenecks,experiment_name="unfiled",seed=-1,alph
     """
         
     if seed == -1:
-        seed = get_seed_numbers("./results/cavs/{}".format(experiment_name))
+        seed = get_seed_numbers("./results/bases/tcav/{}".format(experiment_name))
         if len(seed) == 0:
-            raise Exception("No CAVs found at {}".format("./results/cavs/{}".format(experiment_name)))
+            raise Exception("No CAVs found at {}".format("./results/bases/tcav/{}".format(experiment_name)))
         seed = random.choice(seed)
     
-    dataset_location = "./results/cavs/{}/{}".format(experiment_name,seed)
+    dataset_location = "./results/bases/tcav/{}/{}".format(experiment_name,seed)
     all_matching_files = [] 
     concept_meta_info = []
     
     
-    for bottleneck in bottlenecks:
-        for alpha in alphas:
-            file_name_pattern = "{}_{}_{}-random*-{}-linear-{}.pkl".format(concept,seed,suffix,bottleneck,alpha)
-            all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
-            if len(all_matching_files) == 0:
-                print(concept)
-                                        
-            for file_name in all_matching_files:
-                temp_concept = concept.replace("(","\(").replace(")","\)")
-                re_search = re.search('{}_{}_{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,seed,suffix,bottleneck,alpha),file_name)
-                random_concept = re_search.group(1)
-                concept_meta_info.append({'alpha': alpha,'bottleneck':
-                                          bottleneck, 'random_concept': int(random_concept), 'concept': concept})
-                
+    if "cub" in experiment_name:
+        # Different naming format for CUB
+        for bottleneck in bottlenecks:
+            for alpha in alphas:
+                file_name_pattern = "{}-random*-{}-linear-{}.pkl".format(concept,bottleneck,alpha)
+                all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
+                if len(all_matching_files) == 0:
+                    print(concept)
+                                            
+                for file_name in all_matching_files:
+                    temp_concept = concept.replace("(","\(").replace(")","\)")
+                    re_search = re.search('{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,bottleneck,alpha),file_name)
+                    random_concept = re_search.group(1)
+                    concept_meta_info.append({'alpha': alpha,'bottleneck':
+                                            bottleneck, 'random_concept': int(random_concept), 'concept': concept})
+
+    else:
+        for bottleneck in bottlenecks:
+            for alpha in alphas:
+                file_name_pattern = "{}_{}_{}-random*-{}-linear-{}.pkl".format(concept,seed,suffix,bottleneck,alpha)
+                all_matching_files = glob.glob(dataset_location+"/"+file_name_pattern)
+                if len(all_matching_files) == 0:
+                    print(concept)
+                                            
+                for file_name in all_matching_files:
+                    temp_concept = concept.replace("(","\(").replace(")","\)")
+                    re_search = re.search('{}_{}_{}-random(.*)-{}-linear-{}.pkl'.format(temp_concept,seed,suffix,bottleneck,alpha),file_name)
+                    random_concept = re_search.group(1)
+                    concept_meta_info.append({'alpha': alpha,'bottleneck':
+                                            bottleneck, 'random_concept': int(random_concept), 'concept': concept})
+
+
     if len(concept_meta_info) == 0:
         raise Exception("No CAVs found at {}".format(dataset_location))
 
@@ -284,7 +302,12 @@ def load_tcav_vectors_simple(attribute,dataset,suffix,seed=-1):
     Returns: 
        Numpy array of TCAV vectors
     """
-        
+
+    if attribute in ["is_white","is_scale_0.9"]:
+        # We don't have examples for/against, so just load a random vector, and randomly scale it
+        rand_vector = load_tcav_vectors_simple("is_scale_0.8",dataset,suffix,seed)
+        return rand_vector * np.random.random(rand_vector.shape)
+
     return load_tcav_vectors(attribute,['block4_conv1'],experiment_name=dataset.experiment_name+suffix,seed=seed,suffix=suffix)[0]
 
 def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
@@ -391,7 +414,7 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
     """
 
     
-    dataset_location = "results/concept2vec"
+    dataset_location = "results/bases/concept2vec"
     experiment_name = dataset.experiment_name+suffix
     
     if seed == -1:
@@ -412,7 +435,7 @@ def load_concept2vec_vectors_simple(attribute,dataset,suffix,seed=-1):
 
 def load_vector_from_folder(folder_name):
     def load_vectors_simple(attribute,dataset,suffix,seed=-1):
-        return np.load(open("results/{}/{}/{}/{}.npy".format(folder_name,
+        return np.load(open("results/bases/{}/{}/{}/{}.npy".format(folder_name,
                                                              dataset.experiment_name+suffix,seed,attribute),"rb"),allow_pickle=True)
 
     return load_vectors_simple
@@ -549,4 +572,4 @@ def export_concept_vector(embedding_method,name,dataset,seeds):
     
     for seed in seeds:
         all_embeddings =  np.array([np.mean(embedding_method(i,dataset,"",seed=seed),axis=0) for i in dataset.get_attributes()])
-        np.save(open("results/temp/{}_{}.npy".format(name,seed),"wb"),all_embeddings)
+        np.save(open("intermediary/intervention_hierarchies/{}/{}_{}.npy".format(dataset.root_folder_name,name,seed),"wb"),all_embeddings)

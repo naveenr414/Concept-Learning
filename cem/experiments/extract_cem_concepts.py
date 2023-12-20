@@ -111,7 +111,7 @@ def generate_data_loaders_cub(suffix):
     if suffix in ["_model_robustness","_model_responsiveness"]:
         suffix = ""
 
-    cub_location = 'CUB{}'.format(suffix)
+    cub_location = '../../../datasets/CUB{}'.format(suffix)
     train_data_path = cub_location+'/preprocessed/train.pkl'
     valid_data_path = cub_location+'/preprocessed/val.pkl'
     test_data_path = cub_location+'/preprocessed/test.pkl'
@@ -127,9 +127,7 @@ def generate_data_loaders_cub(suffix):
         resampling=False,
         root_dir=cub_location+'/images/CUB_200_2011',
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'CUB{}/images/CUB_200_2011/'.format(suffix),
-            ''),
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
     valid_dl = load_data(
@@ -143,9 +141,7 @@ def generate_data_loaders_cub(suffix):
         resampling=False,
         root_dir=cub_location+'/images/CUB_200_2011',
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'CUB{}/images/CUB_200_2011/'.format(suffix),
-            ''),
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
     test_dl = load_data(
@@ -159,9 +155,7 @@ def generate_data_loaders_cub(suffix):
         resampling=False,
         root_dir=cub_location+'/images/CUB_200_2011',
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'CUB{}/images/CUB_200_2011/'.format(suffix),
-            ''),
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
     return train_dl, valid_dl, test_dl
@@ -179,10 +173,10 @@ def generate_data_loaders_mnist(suffix):
     if suffix in ["_model_robustness","_model_responsiveness"]:
         suffix = ""
     
-    mnist_location = 'colored_mnist{}'.format(suffix)
-    train_data_path = mnist_location+'/images/train.pkl'
-    valid_data_path = mnist_location+'/images/val.pkl'
-    test_data_path = mnist_location+'/images/test.pkl'
+    mnist_location = '../../../datasets/colored_mnist{}'.format(suffix)
+    train_data_path = mnist_location+'/preprocessed/train.pkl'
+    valid_data_path = mnist_location+'/preprocessed/val.pkl'
+    test_data_path = mnist_location+'/preprocessed/test.pkl'
     
     train_dl = load_data(
         pkl_paths=[train_data_path],
@@ -195,9 +189,7 @@ def generate_data_loaders_mnist(suffix):
         resampling=False,
         root_dir=mnist_location,
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'colored_mnist{}'.format(suffix),
-            '')
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
     valid_dl = load_data(
@@ -211,12 +203,10 @@ def generate_data_loaders_mnist(suffix):
         resampling=False,
         root_dir=mnist_location,
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'colored_mnist{}'.format(suffix),
-            '')
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
-    valid_dl = load_data(
+    test_dl = load_data(
         pkl_paths=[test_data_path],
         use_attr=True,
         no_img=False,
@@ -227,9 +217,131 @@ def generate_data_loaders_mnist(suffix):
         resampling=False,
         root_dir=mnist_location,
         num_workers=num_workers,
-        path_transform=lambda path:path.replace(
-            'colored_mnist{}'.format(suffix),
-            '')
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    return train_dl, valid_dl, test_dl
+
+def generate_data_loaders_chexpert(suffix):
+    """Generate the train and validation dataloaders for the MNIST dataset
+    
+    Parameters: None
+    
+    Returns: Two Things
+        train_dl: A PyTorch dataloader with data, output, and concepts
+        valid_dl: A PyTorch dataloader with data, output, and concepts
+    """
+    
+    if suffix in ["_model_robustness","_model_responsiveness"]:
+        suffix = ""
+    
+    chexpert_location = '../../../datasets/chexpert'
+    train_data_path = chexpert_location+'/preprocessed/train.pkl'
+    valid_data_path = chexpert_location+'/preprocessed/val.pkl'
+    test_data_path = chexpert_location+'/preprocessed/test.pkl'
+    
+    train_dl = load_data(
+        pkl_paths=[train_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=chexpert_location+'/images/',
+        resampling=False,
+        root_dir=chexpert_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    valid_dl = load_data(
+        pkl_paths=[valid_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=chexpert_location+'/images/',
+        resampling=False,
+        root_dir=chexpert_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    test_dl = load_data(
+        pkl_paths=[test_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=chexpert_location+'/images/',
+        resampling=False,
+        root_dir=chexpert_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    return train_dl, valid_dl, test_dl
+
+def generate_data_loaders_dsprites(suffix):
+    """Generate the train and validation dataloaders for the MNIST dataset
+    
+    Parameters: None
+    
+    Returns: Two Things
+        train_dl: A PyTorch dataloader with data, output, and concepts
+        valid_dl: A PyTorch dataloader with data, output, and concepts
+    """
+    
+    if suffix in ["_model_robustness","_model_responsiveness"]:
+        suffix = ""
+    
+    dsprites_location = '../../../datasets/dsprites'
+    train_data_path = dsprites_location+'/preprocessed/train.pkl'
+    valid_data_path = dsprites_location+'/preprocessed/val.pkl'
+    test_data_path = dsprites_location+'/preprocessed/test.pkl'
+    
+    train_dl = load_data(
+        pkl_paths=[train_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=dsprites_location+'/images/',
+        resampling=False,
+        root_dir=dsprites_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    valid_dl = load_data(
+        pkl_paths=[valid_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=dsprites_location+'/images/',
+        resampling=False,
+        root_dir=dsprites_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
+    )
+    
+    test_dl = load_data(
+        pkl_paths=[test_data_path],
+        use_attr=True,
+        no_img=False,
+        batch_size=64,
+        uncertain_label=False,
+        n_class_attr=2,
+        image_dir=dsprites_location+'/images/',
+        resampling=False,
+        root_dir=dsprites_location,
+        num_workers=num_workers,
+        path_transform=lambda path: "../../../datasets/"+path
     )
     
     return train_dl, valid_dl, test_dl
@@ -248,7 +360,7 @@ if __name__ == "__main__":
     parser.add_argument('--sample_train',type=float,default=1.0,help='Fraction of the train dataset to sample')
     parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')    
     parser.add_argument('--sample_test',type=float,default=1.0,help='Fraction of the test dataset to sample')    
-    parser.add_argument('--concept_pair_loss_weight',type=float,default=0.1,help='Weight for the concept pair loss in the loss')
+    parser.add_argument('--concept_pair_loss_weight',type=float,default=0,help='Weight for the concept pair loss in the loss')
 
     args = parser.parse_args()
     
@@ -289,8 +401,16 @@ if __name__ == "__main__":
         n_tasks = 200
     elif experiment_name == "mnist":
         train_dl, valid_dl, test_dl = generate_data_loaders_mnist(suffix)
-        n_concepts = 10 + 10 + 1
+        n_concepts = 20
         n_tasks = 10
+    elif experiment_name == "chexpert":
+        train_dl, valid_dl, test_dl = generate_data_loaders_chexpert(suffix)
+        n_concepts = 13
+        n_tasks = 2
+    elif experiment_name == "dsprites":
+        train_dl, valid_dl, test_dl = generate_data_loaders_dsprites(suffix)
+        n_concepts = 18
+        n_tasks = 100
     else:
         print("{} is not a valid experiment name".format(experiment_name))
 
@@ -324,13 +444,23 @@ if __name__ == "__main__":
         imbalance = None
     elif experiment_name == "cub":
         extractor_arch = "resnet34"
-        cub_location = 'CUB{}'.format(suffix)
+        cub_location = '../../../datasets/CUB{}'.format(suffix)
         train_data_path = cub_location+'/preprocessed/train.pkl'
         imbalance = find_class_imbalance(train_data_path, True)
     elif experiment_name == 'mnist':
-        extractor_arch = resnet50
+        extractor_arch = "resnet34"
+        train_data_path = "../../../datasets/colored_mnist/preprocessed/train.pkl"
+        imbalance = find_class_imbalance(train_data_path, True)
+    elif experiment_name == 'chexpert':
+        extractor_arch = "resnet34"
+        train_data_path = "../../../datasets/chexpert/preprocessed/train.pkl"
+        imbalance = find_class_imbalance(train_data_path, True)
+    elif experiment_name == 'dsprites':
+        extractor_arch = "resnet34"
+        train_data_path = "../../../datasets/dsprites/preprocessed/train.pkl"
         imbalance = None
-        
+
+
     config = dict(
         cv=5,
         max_epochs=num_epochs,
@@ -371,7 +501,7 @@ if __name__ == "__main__":
     config['training_intervention_prob'] = 0.25 
     config['concat_prob'] = False
     config['emb_size'] = config['emb_size']
-    config["embeding_activation"] = "leakyrelu"    
+    config["embeding_activation"] = "leakyrelu"  
     
     training.train_model(
         n_concepts=n_concepts,
@@ -381,7 +511,7 @@ if __name__ == "__main__":
         val_dl=valid_dl,
         test_dl=test_dl,
         split=0,
-        result_dir="results",
+        result_dir="results/{}".format(experiment_name),
         rerun=False,
         project_name='',
         seed=42,
