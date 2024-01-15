@@ -312,7 +312,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 potential_concepts = [i for i in self.related_concepts[concept_idx] if i in intervention_idxs]
                 random.shuffle(potential_concepts)
                 
-                if self.limit != None:
+                if self.limit != None and self.limit > 0:
                     potential_concepts = potential_concepts[:self.limit]
                 
                 for reference_concept in potential_concepts: 
@@ -328,6 +328,7 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                             -self.inactive_intervention_values[concept_idx]
                         )
                     )
+
                     num_tot += 1
 
 
@@ -360,7 +361,18 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         sem_probs = []
         
         all_contexts = []
-        
+
+        zero_shot = False 
+
+        if zero_shot:
+            all_probs = torch.stack([self.sig(self.concept_prob_generators[0](self.sig(context_gen(pre_c))))[:,0] for i, context_gen in enumerate(self.concept_context_generators)])
+            
+            certainty = all_probs * (1-all_probs)
+            certainty = torch.mean(certainty,axis=1)
+            zero_shot_intervention = sorted(list(torch.topk(certainty,k=20,largest=False)[1].detach().tolist()))
+            rounded_c = torch.round(all_probs).T
+
+
         for i, context_gen in enumerate(self.concept_context_generators):
             if self.shared_prob_gen:
                 prob_gen = self.concept_prob_generators[0]
@@ -385,7 +397,16 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 c_true=c,
                 train=train,
             )
-            print("Prob shape {}".format(prob.shape))
+
+            # # TODO: Remove this, just to test out one-shot
+            # if (intervention_idxs == None or intervention_idxs == []) and zero_shot:
+            #     prob = self._after_interventions(
+            #         prob,
+            #         concept_idx=i,
+            #         intervention_idxs=zero_shot_intervention,
+            #         c_true=rounded_c,
+            #         train=train,
+            #     )
 
             probs.append(prob)
             # Then time to mix!
@@ -421,7 +442,6 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
         c_pred = torch.cat(full_vectors, axis=-1)
         
         y = self.c2y_model(c_pred)
-                
         contexts = torch.stack(all_contexts)
                 
         return c_sem, c_pred, y, contexts
@@ -469,26 +489,6 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             loss = task_loss
             concept_loss_scalar = 0.0
             
-        # Ours: Train with concept pair loss weight
-        concept_pair_loss_weight = self.concept_pair_loss_weight
-        print("Concept pair loss weight {}".format(concept_pair_loss_weight))
-        if concept_pair_loss_weight != 0:
-            concept_pair_loss = 0
-            
-            for pair_one in range(context.shape[0]):
-                for pair_two in range(pair_one+1,context.shape[0]):
-                    equal_pairs = torch.dot(c[:,pair_one],c[:,pair_two])
-                    equal_pairs /= len(c)
-                    
-                    concept_one = context[pair_one]
-                    concept_two = context[pair_two]
-
-                    concept_pair_loss += equal_pairs * torch.nn.MSELoss()(concept_one,concept_two)
-                        
-            concept_pair_loss *= concept_pair_loss_weight
-            
-            loss += concept_pair_loss
-                        
         if self.normalize_loss:
             loss = loss / (1 + self.concept_loss_weight * c.shape[-1] + concept_pair_loss_weight * c.shape[-1])
         # compute accuracy

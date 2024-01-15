@@ -49,8 +49,8 @@ def create_concept2vec(dataset,suffix,seed=-1,
     if seed == -1:
         seed = random.randint(0,100000)
     
-    destination_folder = "results/concept2vec/{}/{}".format(dataset.experiment_name+suffix,seed)
-    
+    destination_folder = "results/bases/concept2vec/{}/{}".format(dataset.experiment_name+suffix,seed)
+
     np.random.seed(seed)
     keras.utils.set_random_seed(seed)
     

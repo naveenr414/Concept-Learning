@@ -2,13 +2,13 @@ dataset/*
 .ipynb_checkpoints
 *.egg-info
 src/__pycache__/
+cem/wandb
 src/__pycache__/*
 logs/
 *.pyc
 results/*
 scripts/Figures/
 !results/
-!results/evaluation
 !results/knn
 !dataset
 !dataset/*

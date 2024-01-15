@@ -1,4 +1,4 @@
-Stability: (0.0, 0.0)
+Truthfulness: (0.5230769230769231, 0.0)
 Image Robustness: (0.07692307692307687, 0.0)
 Image Responsiveness: (0.794871794871795, 1.1102230246251565e-16)
-Truthfulness: (0.5076923076923078, 0.0)
+Stability: (0.0, 0.0)

@@ -361,6 +361,9 @@ if __name__ == "__main__":
     parser.add_argument('--sample_valid',type=float,default=1.0,help='Fraction of the valid dataset to sample')    
     parser.add_argument('--sample_test',type=float,default=1.0,help='Fraction of the test dataset to sample')    
     parser.add_argument('--concept_pair_loss_weight',type=float,default=0,help='Weight for the concept pair loss in the loss')
+    parser.add_argument('--lr',type=float,default=0.01,help='Learning Rate for training')
+    parser.add_argument('--weight_decay',type=float,default=4e-05,help="Weight decay regularization")
+    parser.add_argument('--concept_loss_weight',type=float,default=5.0,help="How much emphasis to place on concept accuracy")
 
     args = parser.parse_args()
     
@@ -370,6 +373,9 @@ if __name__ == "__main__":
     validation_epochs = args.validation_epochs
     seed = args.seed
     num_workers = args.num_workers
+    lr = args.lr 
+    weight_decay = args.weight_decay
+    concept_loss_weight = args.concept_loss_weight
 
     pl.seed_everything(args.seed, workers=True)
 
@@ -469,10 +475,10 @@ if __name__ == "__main__":
         num_workers=num_workers,
         emb_size=16,
         extra_dims=0,
-        concept_loss_weight=5,
+        concept_loss_weight=concept_loss_weight,
         normalize_loss=False,
-        learning_rate=0.01,
-        weight_decay=4e-05,
+        learning_rate=lr,
+        weight_decay=weight_decay,
         weight_loss=True,
         pretrain_model=True,
         c_extractor_arch=extractor_arch,
@@ -483,6 +489,7 @@ if __name__ == "__main__":
         early_stopping_delta=0.0,
         sampling_percent=1,
         momentum=0.9,
+        validation_epochs=validation_epochs,
         shared_prob_gen=False,
         sigmoidal_prob=False,
         sigmoidal_embedding=False,
@@ -502,7 +509,8 @@ if __name__ == "__main__":
     config['concat_prob'] = False
     config['emb_size'] = config['emb_size']
     config["embeding_activation"] = "leakyrelu"  
-    
+    config["check_val_every_n_epoch"] = validation_epochs
+
     training.train_model(
         n_concepts=n_concepts,
         n_tasks=n_tasks,
@@ -513,7 +521,7 @@ if __name__ == "__main__":
         split=0,
         result_dir="results/{}".format(experiment_name),
         rerun=False,
-        project_name='',
+        project_name='concept_hierarchies_{}'.format(experiment_name),
         seed=42,
         activation_freq=0,
         single_frequency_epochs=0,

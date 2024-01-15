@@ -207,7 +207,18 @@ def load_data(
     """
     resized_resol = int(resol * 256/224)
     is_training = any(['train.pkl' in f for f in pkl_paths]) and is_training
-    if is_training:
+
+    if 'mnist' in pkl_paths[0] or 'dsprites' in pkl_paths[0] or 'chexpert' in pkl_paths[0]:
+        transform = transforms.Compose([
+            # transforms.Resize((resized_resol, resized_resol)),
+            #transforms.RandomSizedCrop(resol),
+            # transforms.RandomHorizontalFlip(),
+            # transforms.RandomResizedCrop(resol),
+            # transforms.ColorJitter(brightness=32/255, saturation=(0.5, 1.5)),
+            transforms.ToTensor(), #implicitly divides by 255
+            # transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ], std = [ 0.229, 0.224, 0.225 ]),
+            ])
+    elif is_training:
         transform = transforms.Compose([
             #transforms.Resize((resized_resol, resized_resol)),
             #transforms.RandomSizedCrop(resol),
