@@ -398,7 +398,6 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
                 train=train,
             )
 
-            # # TODO: Remove this, just to test out one-shot
             # if (intervention_idxs == None or intervention_idxs == []) and zero_shot:
             #     prob = self._after_interventions(
             #         prob,
@@ -415,7 +414,6 @@ class ConceptEmbeddingModel(ConceptBottleneckModel):
             
             all_contexts.append(context)
             
-            # TODO: Make sure that we analyze only the non-probability part of the embedding 
             # Write which concepts were used to compute outputs
             if not train and c != None:
                 self.update_concepts(context,self.emb_size,c,i)
