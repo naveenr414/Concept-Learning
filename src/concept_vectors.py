@@ -332,6 +332,29 @@ def create_vector_from_label(attribute_name,dataset,suffix,seed=-1):
     concept_vector = [i['attribute_label'][index] for i in train_data]
     return np.array(concept_vector).reshape((1,len(concept_vector)))
 
+def create_vector_from_label_valid(attribute_name,dataset,suffix,seed=-1):
+    """Generate sparse concept vectors, by looking at whether a concept is present in a data point
+        This produces a 0-1 vector, with the vector <0,1,0> representing
+        the presence of the attribute in data point 1, and not present in datapoints 0, 2
+        
+    Arguments:
+        attribute_name: String representing one of the attributes
+        dataset: Object from the Dataset class
+
+    Returns:
+        concept_vector: Numpy vector representing the concept vector for the attribute
+    """
+        
+    all_attributes = dataset.get_attributes()
+    if attribute_name not in all_attributes:
+        raise Exception("Unable to generate vector from attribute {}".format(attribute_name))
+    index = all_attributes.index(attribute_name)
+    
+    val_data = dataset.get_data(suffix=suffix,seed=seed,train=False)
+    concept_vector = [i['attribute_label'][index] for i in val_data]
+    return np.array(concept_vector).reshape((1,len(concept_vector)))
+
+
 def load_label_vectors_simple(attribute,dataset,suffix,seed=-1):
     """Simplified call to create_vector_from_label_cub/mnist that is standardized across embeddings
     

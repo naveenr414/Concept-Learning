@@ -33,6 +33,9 @@ def construct_model(
     active_intervention_values=None,
     inactive_intervention_values=None,
 ):    
+    if config.get("intervention_idxs",None) != None and intervention_idxs == None:
+        intervention_idxs = config.get("intervention_idxs")
+
     if config["architecture"] in ["ConceptEmbeddingModel", "MixtureEmbModel"]:
         model_cls = models_cem.ConceptEmbeddingModel
         extra_params = {

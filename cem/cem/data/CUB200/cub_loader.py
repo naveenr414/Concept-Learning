@@ -8,6 +8,8 @@ import torch
 import pickle
 import numpy as np
 import torchvision.transforms as transforms
+import glob 
+import random
 
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
@@ -80,7 +82,7 @@ class CUBDataset(Dataset):
     Returns a compatible Torch Dataset object customized for the CUB dataset
     """
 
-    def __init__(self, pkl_file_paths, use_attr, no_img, uncertain_label, image_dir, n_class_attr, root_dir='../data/CUB200/', transform=None, concept_transform=None,path_transform=None):
+    def __init__(self, pkl_file_paths, use_attr, no_img, uncertain_label, image_dir, n_class_attr, root_dir='../data/CUB200/', transform=None, concept_transform=None,path_transform=None,correlation_rate=-1.0):
         """
         Arguments:
         pkl_file_paths: list of full path to all the pkl data
@@ -106,9 +108,34 @@ class CUBDataset(Dataset):
         self.n_class_attr = n_class_attr
         self.root_dir = root_dir
         self.path_transform = path_transform
+        self.correlation_rate = correlation_rate
+        self.baseline_colors = {}
+
+        for i in range(10):
+            all_files = glob.glob("../../../datasets/colored_mnist/images/{}/*.png".format(i))
+            image = Image.open(all_files[0])
+            image_array = np.array(image)
+            all_colors = [image_array[i,j] for i in range(28) for j in range(28) if np.sum(image_array[i,j]) != 0][0]
+            self.baseline_colors[i] = list(all_colors)
 
     def __len__(self):
         return len(self.data)
+
+    def swap_color(self,img_pixel,num,correlation_rate):
+        img_pixel = np.array(img_pixel)
+        if random.random() < correlation_rate:
+            curr_color = self.baseline_colors[num]
+            rand_num = num 
+        else:
+            all_other_nums = [i for i in range(10) if i!=num]
+            rand_num = random.sample(all_other_nums,1)[0]
+            curr_color = self.baseline_colors[rand_num]
+        
+        for i in range(len(img_pixel)):
+            for j in range(len(img_pixel[0])):
+                if np.sum(img_pixel[i][j]) != 0:
+                    img_pixel[i,j] = np.array(curr_color)
+        return Image.fromarray(img_pixel), rand_num 
 
     def __getitem__(self, idx):
         img_data = self.data[idx]
@@ -118,6 +145,11 @@ class CUBDataset(Dataset):
 
         img = Image.open(img_path).convert('RGB')
         class_label = img_data['class_label']
+        if self.correlation_rate >= 0.0:
+            img, rand_num = self.swap_color(img,class_label,self.correlation_rate)
+            img_data['attribute_label'][class_label*2+1] = 0
+            img_data['attribute_label'][rand_num*2+1] = 1
+
         if self.transform:
             img = self.transform(img)
 
@@ -199,6 +231,7 @@ def load_data(
     concept_transform=None,
     path_transform=None,
     is_training=True,
+    correlation_rate=-1.0,
 ):
     """
     Note: Inception needs (299,299,3) images with inputs scaled between -1 and 1
@@ -248,7 +281,8 @@ def load_data(
         transform=transform,
         root_dir=root_dir,
         concept_transform=concept_transform,
-        path_transform=path_transform
+        path_transform=path_transform,
+        correlation_rate=correlation_rate
     )
     if is_training:
         drop_last = True
