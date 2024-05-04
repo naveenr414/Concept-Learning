@@ -32,7 +32,7 @@ class VGGWrapper(model.KerasModelWrapper):
         return np.array([224,224,3])
 
 def create_concept2vec(dataset,suffix,seed=-1,
-                             embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None):
+                             embedding_size=32,num_epochs=5,dataset_size=1000,initial_embedding=None,write_data=True,flip_percentage=0):
     """Generate concept2vec vectors by training a Skipgram architecture on correlated concepts
     
     Arguments:
@@ -60,6 +60,12 @@ def create_concept2vec(dataset,suffix,seed=-1,
     attributes = dataset.get_attributes()
     V = len(attributes)
     all_data = dataset.get_data(seed,suffix)[:dataset_size]
+
+    if flip_percentage > 0:
+        for i in range(len(all_data)):
+            for j in range(len(all_data[i]['attribute_label'])):
+                if np.random.random() < flip_percentage:
+                    all_data[i]['attribute_label'][j] = 1-  all_data[i]['attribute_label'][j]
     
     SkipGram = create_skipgram_architecture(embedding_size,V,initial_embedding=initial_embedding)
     
@@ -87,7 +93,9 @@ def create_concept2vec(dataset,suffix,seed=-1,
     
     vectors = SkipGram.get_weights()[0]
     
-    np.save(open("{}/vectors.npy".format(destination_folder),"wb"),vectors)
+    if write_data:
+        np.save(open("{}/vectors.npy".format(destination_folder),"wb"),vectors)
+    return vectors 
     
 def create_tcav_dataset(attribute_name,dataset,num_random_exp,
                         max_examples=100,images_per_folder=50,seed=-1,suffix='',model_name="VGG16",bottlenecks=["block4_conv1"]):
