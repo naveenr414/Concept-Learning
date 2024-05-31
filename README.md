@@ -1,4 +1,4 @@
-# Concept Hierarchies for Concept Learning Methods
+# Understanding Inter-Concept Relationships in Concept-Based Models
 
 ![Concept Hierarchies](img/pull_figure.png)
 
