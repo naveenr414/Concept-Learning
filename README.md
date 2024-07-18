@@ -6,6 +6,8 @@ This repository contains the implementation for the thesis "Understanding Inter-
 
 This work was done by [Naveen Raman](https://naveenraman.com/), [Mateo Espinosa](https://hairyballtheorem.com/), and [Mateja Jamnik](https://www.cl.cam.ac.uk/~mj201/). 
 
+Paper link: [https://arxiv.org/abs/2405.18217](https://arxiv.org/abs/2405.18217)
+
 #### TL;DR
 We construct concept bases, a way to study inter relationships in concept models. This allows us to understand the types of inter-concept relationships captured by existing concept-based models. Additionally, well-constructed concept bases can assist with downstream applications such as concept intervention. 
 
